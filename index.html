@@ -1,0 +1,2931 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="theme-color" content="#e8ebf5">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>JONY KIDS — EduPanel</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+:root {
+  /* CLAYMORPHISM — yorug', yumshoq, jiddiy */
+  --bg: #e8ebf5;
+  --bg2: #eef1fa;
+  --bg3: #e2e6f2;
+  --card: #eef1fa;
+  --card-border: transparent;
+  --glass: #e6eaf6;
+  --glass-border: rgba(120,135,180,0.14);
+  --text: #2a3354;
+  --text2: #6b779b;
+  --text3: #9aa4c4;
+  --accent: #6c7ce0;        /* yumshoq indigo */
+  --accent-ink: #ffffff;
+  --accent2: #8a7cd8;
+  --yellow: #e0a23c;
+  --red: #e06b7c;
+  --green: #4fb89a;
+  --blue: #6c7ce0;
+  --nav-h: 72px;
+  --radius: 22px;
+  --radius-sm: 14px;
+  /* Clay soyalar: tashqi (chiqiq) va ichki (botiq) */
+  --clay-light: rgba(255,255,255,0.9);
+  --clay-dark: rgba(174,184,214,0.55);
+  --inset-bg: #e2e6f2;
+  --shadow-out: 6px 6px 14px var(--clay-dark), -6px -6px 14px var(--clay-light);
+  --shadow-out-sm: 4px 4px 9px var(--clay-dark), -4px -4px 9px var(--clay-light);
+  --shadow-in: inset 4px 4px 9px var(--clay-dark), inset -4px -4px 9px var(--clay-light);
+  --shadow-press: inset 5px 5px 11px var(--clay-dark), inset -5px -5px 11px var(--clay-light);
+}
+.light {
+  /* light — root bilan bir xil (asosiy tema endi yorug') */
+  --bg: #e8ebf5;
+  --bg2: #eef1fa;
+  --bg3: #e2e6f2;
+  --card: #eef1fa;
+  --card-border: transparent;
+  --glass: #e6eaf6;
+  --text: #2a3354;
+  --text2: #6b779b;
+  --text3: #9aa4c4;
+}
+/* Qorong'i tema — yumshoq ko'mir clay */
+.dark {
+  --bg: #262b40;        /* sahifa va karta foni bir xil — clay uchun shart */
+  --bg2: #2b3048;
+  --bg3: #262b40;
+  --card: #262b40;      /* karta = bg, soya orqali ajraladi */
+  --card-border: transparent;
+  --glass: #20243a;     /* inset/botiq sirt — fondan biroz qora */
+  --glass-border: rgba(0,0,0,0.25);
+  --text: #e7ebfb;
+  --text2: #98a2c6;
+  --text3: #5f698c;
+  --accent: #8b9bff;
+  --accent-ink: #1a1e30;
+  --accent2: #a99bf0;
+  --yellow: #e0b260;
+  --red: #e58597;
+  --green: #5fc4a6;
+  --blue: #8b9bff;
+  /* Qorong'i clay soyalar: yuqori-chap nozik yorug'lik, past-o'ng aniq qorong'ilik */
+  --clay-light: rgba(120,132,180,0.16);
+  --clay-dark: rgba(8,10,20,0.7);
+  --inset-bg: #20243a;
+  /* Soya formulalarini bu yerda ham qayta hisoblash shart (root html darajasi dark qiymatларни ko'rmaydi) */
+  --shadow-out: 6px 6px 14px var(--clay-dark), -6px -6px 14px var(--clay-light);
+  --shadow-out-sm: 4px 4px 9px var(--clay-dark), -4px -4px 9px var(--clay-light);
+  --shadow-in: inset 4px 4px 9px var(--clay-dark), inset -4px -4px 9px var(--clay-light);
+  --shadow-press: inset 5px 5px 11px var(--clay-dark), inset -5px -5px 11px var(--clay-light);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+body {
+  font-family: 'Manrope', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+  transition: background 0.3s, color 0.3s;
+}
+/* Clay dizaynda fon doiralari yo'q — tekis, jiddiy fon */
+.orb { display: none; }
+#app { position: relative; z-index: 1; }
+
+/* AUTH */
+#auth-screen {
+  min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+.auth-card {
+  width: 100%; max-width: 380px;
+  background: var(--card);
+  border-radius: 30px; padding: 36px 28px;
+  box-shadow: var(--shadow-out);
+}
+.auth-logo { text-align: center; margin-bottom: 28px; }
+.auth-logo h1 { font-family: 'Sora', sans-serif; font-size: 26px; font-weight: 700; color: var(--accent); }
+.auth-logo p { color: var(--text2); font-size: 13px; margin-top: 4px; }
+.lang-btns { display: flex; gap: 8px; margin-bottom: 24px; }
+.lang-btn {
+  flex: 1; padding: 9px; border-radius: 12px; border: none;
+  background: var(--card); color: var(--text2); font-size: 13px; font-family: 'Manrope', sans-serif;
+  cursor: pointer; transition: all 0.18s; box-shadow: var(--shadow-out-sm);
+}
+.lang-btn:active { box-shadow: var(--shadow-press); }
+.lang-btn.active { color: var(--accent); font-weight: 700; box-shadow: var(--shadow-in); }
+
+/* INPUTS */
+.inp-group { margin-bottom: 16px; }
+.inp-group label { display: block; font-size: 12px; color: var(--text2); margin-bottom: 8px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+.inp-group input, .inp-group select, .inp-group textarea {
+  width: 100%; padding: 13px 16px; border-radius: 14px;
+  border: none; background: var(--inset-bg);
+  color: var(--text); font-family: 'Manrope', sans-serif; font-size: 14px;
+  outline: none; transition: box-shadow 0.2s; box-shadow: var(--shadow-in);
+}
+.inp-group input:focus, .inp-group select:focus, .inp-group textarea:focus { box-shadow: var(--shadow-in), 0 0 0 2px var(--accent); }
+.inp-group input::placeholder, .inp-group textarea::placeholder { color: var(--text3); }
+.inp-group select option { background: var(--bg2); color: var(--text); }
+
+/* BUTTONS */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 13px 22px; border-radius: 16px; border: none;
+  font-family: 'Manrope', sans-serif; font-size: 14px; font-weight: 700;
+  cursor: pointer; transition: transform 0.12s, box-shadow 0.18s; white-space: nowrap;
+  box-shadow: var(--shadow-out-sm);
+}
+.btn:active { box-shadow: var(--shadow-press); transform: scale(0.985); }
+.btn-primary { background: var(--accent); color: var(--accent-ink); box-shadow: var(--shadow-out-sm); }
+.btn-primary:active { filter: brightness(0.94); box-shadow: var(--shadow-press); }
+.btn-secondary { background: var(--card); color: var(--text); }
+.btn-danger { background: var(--card); color: var(--red); }
+.btn-full { width: 100%; }
+.btn-sm { padding: 8px 14px; font-size: 12px; border-radius: 12px; }
+.btn-icon { width: 42px; height: 42px; padding: 0; border-radius: 14px; }
+
+/* MAIN LAYOUT */
+#main-app { display: none; }
+.top-bar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  background: var(--bg);
+  border-bottom: none;
+  padding: 14px 18px; display: flex; align-items: center; justify-content: space-between;
+}
+.top-bar-title { font-family: 'Sora', sans-serif; font-size: 16px; font-weight: 700; }
+.top-bar-right { display: flex; gap: 10px; align-items: center; }
+.avatar {
+  width: 42px; height: 42px; border-radius: 50%; background: var(--accent);
+  display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 800; color: var(--accent-ink);
+  cursor: pointer; box-shadow: var(--shadow-out-sm);
+}
+
+/* BOTTOM NAV */
+.bottom-nav {
+  position: fixed; bottom: 14px; left: 14px; right: 14px; z-index: 100;
+  background: var(--bg);
+  border-top: none; border-radius: 24px;
+  display: flex; height: var(--nav-h);
+  box-shadow: var(--shadow-out);
+}
+.nav-item {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 5px; cursor: pointer; color: var(--text3); transition: color 0.2s; font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.4px; border-radius: 18px; margin: 8px 4px;
+}
+.nav-item svg { width: 22px; height: 22px; transition: transform 0.2s; }
+.nav-item.active { color: var(--accent); box-shadow: var(--shadow-in); }
+.nav-item.active svg { transform: scale(1.08); }
+
+/* PAGE CONTENT */
+.page { display: none; padding: 64px 0 calc(var(--nav-h) + 28px); min-height: 100vh; }
+.page.active { display: block; }
+.page-content { padding: 16px; }
+
+/* CARDS */
+.card {
+  background: var(--card); border: none;
+  border-radius: var(--radius); padding: 18px; margin-bottom: 14px;
+  box-shadow: var(--shadow-out);
+}
+.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 18px; }
+.stat-card {
+  background: var(--card); border: none;
+  border-radius: var(--radius-sm); padding: 16px; text-align: center; cursor: pointer;
+  transition: box-shadow 0.18s, transform 0.12s; box-shadow: var(--shadow-out-sm);
+}
+.stat-card:active { transform: scale(0.98); }
+.stat-card.active { box-shadow: var(--shadow-in); color: var(--accent); }
+.stat-num { font-size: 26px; font-weight: 800; font-family: 'Sora', sans-serif; }
+.stat-label { font-size: 11px; color: var(--text2); margin-top: 2px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+
+/* STUDENT CARD */
+.student-card {
+  background: var(--card); border: none;
+  border-radius: var(--radius); padding: 16px; margin-bottom: 12px;
+  box-shadow: var(--shadow-out-sm);
+  display: flex; align-items: center; gap: 12px; cursor: pointer;
+  transition: box-shadow 0.18s, transform 0.12s;
+}
+.student-card:active { transform: scale(0.98); box-shadow: var(--shadow-in); }
+.student-avatar {
+  width: 46px; height: 46px; border-radius: 50%; display: flex; align-items: center;
+  justify-content: center; font-weight: 700; font-size: 16px; flex-shrink: 0;
+  box-shadow: var(--shadow-out-sm);
+}
+.student-info { flex: 1; min-width: 0; }
+.student-name { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.student-sub { font-size: 12px; color: var(--text2); margin-top: 2px; }
+.status-badge {
+  font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 20px;
+  white-space: nowrap; text-transform: uppercase; letter-spacing: 0.5px;
+}
+
+/* STATUS COLORS — yumshoq pastel */
+.s-trial { background: rgba(79,184,154,0.16); color: #3a9e82; }
+.s-contract { background: rgba(108,124,224,0.16); color: #5b6bd0; }
+.s-frozen { background: rgba(224,162,60,0.16); color: #c4842c; }
+.s-left { background: rgba(224,107,124,0.16); color: #d05568; }
+.s-returned { background: rgba(95,196,166,0.16); color: #3a9e82; }
+
+/* MODAL */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(40,48,80,0.32); backdrop-filter: blur(3px);
+  display: none; align-items: flex-end;
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  width: 100%; max-height: 90vh; overflow-y: auto;
+  background: var(--bg); border-radius: 30px 30px 0 0;
+  padding: 22px 20px 40px;
+  animation: slideUp 0.3s ease;
+  box-shadow: 0 -8px 30px rgba(40,48,80,0.18);
+}
+@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.modal-handle { width: 44px; height: 5px; background: var(--text3); opacity: 0.5; border-radius: 3px; margin: 0 auto 20px; }
+.modal-title { font-size: 18px; font-weight: 800; margin-bottom: 20px; }
+
+/* PILL SELECTS */
+.pill-row { display: flex; flex-wrap: wrap; gap: 9px; margin-bottom: 12px; }
+.pill {
+  padding: 9px 16px; border-radius: 16px; border: none;
+  background: var(--card); color: var(--text2); font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: all 0.18s; font-family: 'Manrope', sans-serif;
+  box-shadow: var(--shadow-out-sm);
+}
+.pill:active { box-shadow: var(--shadow-press); }
+.pill.selected { font-weight: 700; box-shadow: var(--shadow-in); }
+.pill.trial { color: #3a9e82; }
+.pill.contract { color: #5b6bd0; }
+.pill.frozen { color: #c4842c; }
+.pill.left { color: #d05568; }
+.pill.returned { color: #3a9e82; }
+.pill-entity { color: var(--text); }
+.pill-entity.selected { color: var(--accent); box-shadow: var(--shadow-in); }
+
+/* SEARCH */
+.search-box {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--inset-bg);
+  border-radius: 16px; padding: 12px 16px; margin-bottom: 16px;
+  box-shadow: var(--shadow-in);
+}
+.search-box input {
+  flex: 1; background: transparent; border: none; outline: none;
+  color: var(--text); font-family: 'Manrope', sans-serif; font-size: 14px;
+}
+.search-box input::placeholder { color: var(--text3); }
+.search-icon { color: var(--text3); font-size: 18px; }
+
+/* TOAST */
+#toast {
+  position: fixed; top: 18px; left: 50%; transform: translateX(-50%) translateY(-12px);
+  background: var(--accent); color: var(--accent-ink); padding: 13px 20px; border-radius: 16px;
+  font-size: 13px; font-weight: 700; z-index: 999; line-height: 1.4;
+  opacity: 0; transition: opacity 0.3s, transform 0.3s; pointer-events: none;
+  max-width: min(420px, calc(100vw - 32px)); text-align: center;
+  box-shadow: 4px 4px 16px rgba(40,48,80,0.3);
+}
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+#toast.warn { background: var(--yellow); }
+#toast.ok { background: var(--green); }
+
+/* ATTENDANCE */
+.shift-card {
+  background: var(--card); border: none;
+  border-radius: var(--radius); padding: 16px; margin-bottom: 12px;
+  box-shadow: var(--shadow-out-sm);
+}
+.shift-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.day-pill {
+  width: 34px; height: 34px; border-radius: 10px; border: none;
+  background: var(--inset-bg); color: var(--text2); font-size: 12px; font-weight: 700;
+  cursor: pointer; font-family: 'Manrope', sans-serif; box-shadow: var(--shadow-in);
+  transition: all 0.15s;
+}
+.day-pill.on { background: var(--accent); color: var(--accent-ink); box-shadow: var(--shadow-out-sm); }
+.time-badge {
+  background: var(--card); border: none;
+  color: var(--accent); font-size: 13px; font-weight: 700; padding: 5px 13px; border-radius: 10px;
+  box-shadow: var(--shadow-out-sm);
+}
+.late-badge {
+  background: rgba(224,162,60,0.16); border: none;
+  color: var(--yellow); font-size: 12px; font-weight: 700; padding: 4px 11px; border-radius: 10px;
+}
+.on-time-badge {
+  background: rgba(79,184,154,0.16); border: none;
+  color: var(--green); font-size: 12px; font-weight: 700; padding: 4px 11px; border-radius: 10px;
+}
+
+/* TABS */
+.tabs { display: flex; background: var(--inset-bg); border-radius: 16px; padding: 6px; margin-bottom: 18px; box-shadow: var(--shadow-in); }
+.tab { flex: 1; padding: 9px; text-align: center; border-radius: 12px; cursor: pointer; font-size: 13px; font-weight: 700; color: var(--text2); transition: all 0.18s; }
+.tab.active { background: var(--card); color: var(--accent); box-shadow: var(--shadow-out-sm); }
+
+/* BRANCH SELECTOR */
+.branch-chip {
+  display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px;
+  border-radius: 16px; border: none; background: var(--card);
+  font-size: 12px; font-weight: 600; cursor: pointer; margin: 4px;
+  box-shadow: var(--shadow-out-sm);
+}
+.branch-chip.active { color: var(--accent); box-shadow: var(--shadow-in); }
+
+/* TASK CARD */
+.task-card {
+  background: var(--card); border: none;
+  border-radius: var(--radius); padding: 16px; margin-bottom: 12px;
+  box-shadow: var(--shadow-out);
+}
+.task-card.urgent { border-left: 4px solid var(--red); }
+.task-card.normal { border-left: 4px solid var(--accent2); }
+.task-meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+.tag { font-size: 11px; padding: 4px 10px; border-radius: 8px; font-weight: 700; }
+.tag-blue { background: rgba(108,124,224,0.16); color: var(--blue); }
+.tag-yellow { background: rgba(224,162,60,0.16); color: var(--yellow); }
+.tag-red { background: rgba(224,107,124,0.16); color: var(--red); }
+
+/* SETTINGS */
+.settings-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 0; border-bottom: 1px solid var(--glass-border);
+}
+.settings-row:last-child { border-bottom: none; }
+.toggle {
+  width: 48px; height: 26px; border-radius: 13px; background: var(--inset-bg);
+  position: relative; cursor: pointer; transition: background 0.2s; box-shadow: var(--shadow-in);
+}
+.toggle.on { background: var(--accent); box-shadow: none; }
+.toggle::after {
+  content: ''; position: absolute; width: 20px; height: 20px; border-radius: 50%;
+  background: var(--card); top: 3px; left: 3px; transition: left 0.2s; box-shadow: 1px 1px 3px rgba(40,48,80,0.3);
+}
+.toggle.on::after { left: 25px; background: #fff; }
+
+/* DIVIDER */
+.divider { border: none; border-top: 1px solid var(--glass-border); margin: 14px 0; }
+
+/* FREEZE COUNTDOWN */
+.freeze-days { font-size: 22px; font-weight: 800; }
+.freeze-days.green { color: var(--green); }
+.freeze-days.yellow { color: var(--yellow); }
+.freeze-days.red { color: var(--red); }
+
+/* EMPTY STATE */
+.empty { text-align: center; padding: 48px 24px; color: var(--text3); }
+.empty-icon { font-size: 40px; margin-bottom: 12px; }
+.empty h3 { font-size: 16px; color: var(--text2); margin-bottom: 6px; }
+
+/* SECTION HEADER */
+.section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.section-title { font-size: 18px; font-weight: 800; }
+
+/* SCROLLBAR */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--text3); opacity: 0.4; border-radius: 3px; }
+
+/* ADMIN BADGE */
+.role-badge {
+  font-size: 10px; font-weight: 700; padding: 3px 9px; border-radius: 8px;
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+.role-super { background: rgba(224,162,60,0.18); color: var(--yellow); }
+.role-admin { background: rgba(108,124,224,0.18); color: var(--accent2); }
+.role-staff { background: rgba(79,184,154,0.18); color: var(--green); }
+
+/* COLOR PICKER */
+.color-dot {
+  width: 30px; height: 30px; border-radius: 50%; cursor: pointer;
+  border: 3px solid transparent; transition: all 0.2s; display: inline-block;
+}
+.color-dot.selected { border-color: var(--card); transform: scale(1.18); box-shadow: var(--shadow-out-sm); }
+
+/* REPLY THREAD */
+.reply-box { background: var(--inset-bg); border-radius: 14px; padding: 12px; margin-top: 8px; box-shadow: var(--shadow-in); }
+.reply-item { font-size: 13px; margin-bottom: 6px; }
+.reply-item:last-child { margin-bottom: 0; }
+.reply-from { font-weight: 700; color: var(--accent); font-size: 11px; margin-bottom: 2px; }
+
+/* REPORT SECTION */
+.report-opt { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+.report-btn { padding: 9px 17px; border-radius: 14px; border: none; background: var(--card); color: var(--text); font-size: 13px; font-weight: 600; cursor: pointer; font-family: 'Manrope', sans-serif; box-shadow: var(--shadow-out-sm); }
+.report-btn.active { color: var(--accent2); box-shadow: var(--shadow-in); }
+
+.hidden { display: none !important; }
+
+/* ============================================================
+   LOADERS & SPINNERS
+   ============================================================ */
+/* Full-screen overlay loader for important async actions */
+#loader-overlay {
+  position: fixed; inset: 0; z-index: 500;
+  display: none; align-items: center; justify-content: center;
+  background: rgba(40,48,80,0.28); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+}
+#loader-overlay.show { display: flex; animation: fadeIn 0.2s ease; }
+.loader-box {
+  display: flex; flex-direction: column; align-items: center; gap: 16px;
+  padding: 30px 38px; border-radius: 26px;
+  background: var(--bg); border: none;
+  box-shadow: var(--shadow-out);
+}
+.loader-text { font-size: 13px; font-weight: 600; color: var(--text2); letter-spacing: 0.3px; }
+
+/* Orbital dual-ring spinner */
+.spinner-ring {
+  width: 46px; height: 46px; position: relative;
+}
+.spinner-ring::before, .spinner-ring::after {
+  content: ''; position: absolute; inset: 0; border-radius: 50%;
+  border: 3px solid transparent;
+}
+.spinner-ring::before {
+  border-top-color: var(--accent); border-right-color: var(--accent);
+  animation: spin 0.9s linear infinite;
+}
+.spinner-ring::after {
+  inset: 8px; border-bottom-color: var(--accent2); border-left-color: var(--accent2);
+  animation: spin 1.3s linear infinite reverse;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+/* Inline button spinner */
+.btn-spinner {
+  width: 16px; height: 16px; border-radius: 50%;
+  border: 2px solid currentColor; border-right-color: transparent;
+  display: inline-block; animation: spin 0.7s linear infinite;
+  vertical-align: -2px;
+}
+.btn.loading { pointer-events: none; opacity: 0.75; }
+
+/* Skeleton shimmer for list loading */
+.skeleton-card {
+  height: 76px; border-radius: var(--radius); margin-bottom: 12px;
+  background: var(--card); box-shadow: var(--shadow-out-sm);
+  position: relative; overflow: hidden;
+}
+.skeleton-card::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(100deg, transparent 30%, var(--glass) 50%, transparent 70%);
+  background-size: 200% 100%; animation: shimmer 1.3s ease-in-out infinite;
+}
+@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+
+/* ============================================================
+   DESKTOP / TABLET RESPONSIVE
+   ============================================================ */
+@media (min-width: 768px) {
+  :root { --nav-h: 0px; --shell: 920px; }
+
+  body { background: var(--bg); }
+
+  /* App becomes a centered shell with a sidebar */
+  #main-app[style*="block"] { display: flex !important; }
+  #main-app {
+    max-width: var(--shell);
+    margin: 0 auto;
+    min-height: 100vh;
+    gap: 0;
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  /* Top bar: contained, sticky instead of full-width fixed */
+  .top-bar {
+    position: sticky; top: 0; left: auto; right: auto;
+    border-radius: 0 0 24px 24px;
+    border: none;
+    padding: 18px 28px;
+    box-shadow: var(--shadow-out-sm);
+  }
+
+  /* Sidebar nav (replaces bottom nav) */
+  .bottom-nav {
+    position: fixed; top: 50%; transform: translateY(-50%);
+    left: max(16px, calc((100vw - var(--shell)) / 2 - 96px));
+    right: auto; bottom: auto;
+    flex-direction: column; height: auto; width: 80px;
+    border: none; border-radius: 26px;
+    padding: 14px 10px; gap: 8px;
+    box-shadow: var(--shadow-out);
+  }
+  .nav-item {
+    flex: none; padding: 12px 4px; border-radius: 16px; margin: 0;
+    transition: box-shadow 0.18s, color 0.18s;
+  }
+  .nav-item.active { color: var(--accent); box-shadow: var(--shadow-in); }
+  .nav-item svg { width: 24px; height: 24px; }
+
+  /* When sidebar doesn't fit beside the shell, dock it to the left edge */
+  @media (max-width: 1130px) {
+    .bottom-nav { left: 14px; }
+    #main-app { padding-left: 104px; }
+  }
+
+  /* Pages */
+  .page { padding: 0 0 40px; }
+  .page-content { padding: 28px; max-width: 760px; margin: 0 auto; }
+
+  /* Auth card a touch larger */
+  .auth-card { max-width: 420px; padding: 44px 36px; }
+
+  /* Students: multi-column grid on wide screens */
+  #students-list {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+  }
+  #students-list .student-card { margin-bottom: 0; }
+  #students-list .empty { grid-column: 1 / -1; }
+
+  /* Stats in a single row */
+  .stat-grid { grid-template-columns: repeat(4, 1fr); }
+
+  /* Hover affordances */
+  .student-card { transition: box-shadow 0.18s, transform 0.15s; }
+  .student-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-out); }
+  .stat-card:hover { box-shadow: var(--shadow-out); }
+  .btn:hover { transform: translateY(-1px); }
+
+  /* Modals: centered dialog instead of bottom sheet */
+  .modal-overlay { align-items: center; justify-content: center; padding: 24px; }
+  .modal {
+    max-width: 480px; border-radius: 28px;
+    padding: 30px 28px 32px; animation: popIn 0.22s ease;
+    box-shadow: var(--shadow-out);
+  }
+  .modal-handle { display: none; }
+
+  /* My-attendance buttons side by side */
+  #page-myattend .page-content { max-width: 520px; }
+}
+
+@media (min-width: 1024px) {
+  #students-list { grid-template-columns: 1fr 1fr 1fr; }
+  .page-content { max-width: 860px; }
+}
+
+@keyframes popIn {
+  from { transform: scale(0.96); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+</style>
+</head>
+<body>
+<div class="orb orb1"></div>
+<div class="orb orb2"></div>
+<div class="orb orb3"></div>
+
+<div id="toast">✓ Saqlandi</div>
+
+<!-- GLOBAL LOADER -->
+<div id="loader-overlay">
+  <div class="loader-box">
+    <div class="spinner-ring"></div>
+    <div class="loader-text" id="loader-text">Yuklanmoqda...</div>
+  </div>
+</div>
+
+<!-- BRANCH PICK MODAL (bir nechta filial radiusida bo'lganda) -->
+<div class="modal-overlay" id="modal-branch-pick">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Filialni tanlang</div>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:16px;">Qaysi filialda davomat qilmoqchisiz?</p>
+    <div id="branch-pick-list"></div>
+    <button class="btn btn-secondary btn-full" onclick="cancelBranchPick()" style="margin-top:6px;">Bekor qilish</button>
+  </div>
+</div>
+
+<!-- LATE REASON MODAL (xodim kech kelganda) -->
+<div class="modal-overlay" id="modal-late-reason">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Kechikish sababi</div>
+    <p id="late-reason-sub" style="font-size:13px;color:var(--text2);margin-bottom:16px;">Siz kech keldingiz. Iltimos, sababini ko'rsating.</p>
+    <div class="inp-group">
+      <label>Sabab</label>
+      <div class="pill-row" id="late-reason-pills"></div>
+    </div>
+    <div class="inp-group">
+      <label>Izoh (ixtiyoriy)</label>
+      <textarea id="late-comment" rows="2" placeholder="Qo'shimcha izoh yozishingiz mumkin..."></textarea>
+    </div>
+    <button class="btn btn-primary btn-full" onclick="submitLateReason()" style="margin-bottom:8px;">Tasdiqlash</button>
+    <button class="btn btn-secondary btn-full" onclick="cancelLateReason()">Bekor qilish</button>
+  </div>
+</div>
+
+<!-- AUTH SCREEN -->
+<div id="auth-screen">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <h1>JONY KIDS</h1>
+      <p id="auth-subtitle">O'quv markazi boshqaruv tizimi</p>
+    </div>
+    <div class="lang-btns">
+      <button class="lang-btn active" onclick="setLang('uz')">🇺🇿 UZB</button>
+      <button class="lang-btn" onclick="setLang('ru')">🇷🇺 RUS</button>
+      <button class="lang-btn" onclick="setLang('en')">🇬🇧 ENG</button>
+    </div>
+    <div class="inp-group">
+      <label id="lbl-login">Login</label>
+      <input type="text" id="login-input" placeholder="login" autocomplete="username">
+    </div>
+    <div class="inp-group">
+      <label id="lbl-pass">Parol</label>
+      <input type="password" id="pass-input" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button class="btn btn-primary btn-full" onclick="doLogin()" style="margin-top:8px;">
+      <span id="lbl-enter">Kirish</span>
+    </button>
+    <p id="auth-error" style="color:var(--red);font-size:13px;text-align:center;margin-top:10px;display:none;"></p>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="main-app">
+  <!-- TOP BAR -->
+  <div class="top-bar">
+    <div>
+      <div class="top-bar-title" id="page-title">Talabalar</div>
+      <div id="user-role-badge"></div>
+    </div>
+    <div class="top-bar-right">
+      <button class="btn btn-icon btn-secondary" onclick="toggleTheme()" title="Tema" style="font-size:18px;">☀</button>
+      <div class="avatar" id="user-avatar" onclick="showPage('settings')">?</div>
+    </div>
+  </div>
+
+  <!-- PAGES -->
+
+  <!-- STUDENTS PAGE -->
+  <div class="page" id="page-students">
+    <div class="page-content">
+      <div class="stat-grid" style="grid-template-columns:1fr 1fr;">
+        <div class="stat-card" onclick="filterStatus('trial')" id="stat-trial">
+          <div class="stat-num" style="color:#3a9e82" id="cnt-trial">0</div>
+          <div class="stat-label" id="sl-trial">Sinov</div>
+        </div>
+        <div class="stat-card" onclick="filterStatus('contract')" id="stat-contract">
+          <div class="stat-num" style="color:#5b6bd0" id="cnt-contract">0</div>
+          <div class="stat-label" id="sl-contract">Shartnoma</div>
+        </div>
+        <div class="stat-card" onclick="filterStatus('frozen')" id="stat-frozen">
+          <div class="stat-num" style="color:#c4842c" id="cnt-frozen">0</div>
+          <div class="stat-label" id="sl-frozen">Muzlatilgan</div>
+        </div>
+        <div class="stat-card" onclick="filterStatus('returned')" id="stat-returned">
+          <div class="stat-num" style="color:#5fc4a6" id="cnt-returned">0</div>
+          <div class="stat-label" id="sl-returned">Qaytgan</div>
+        </div>
+        <div class="stat-card" onclick="filterStatus('left')" id="stat-left" style="grid-column:1 / -1;">
+          <div class="stat-num" style="color:#d05568" id="cnt-left">0</div>
+          <div class="stat-label" id="sl-left">Ketgan</div>
+        </div>
+      </div>
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="student-search" placeholder="Qidirish..." oninput="renderStudents()">
+        <button class="btn btn-sm btn-secondary" onclick="clearFilter()" id="filter-clear" style="display:none">✕</button>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap;">
+        <span style="font-size:12px;color:var(--text2);font-weight:600;">📅 Sana:</span>
+        <input type="date" id="student-from" onchange="renderStudents()" style="flex:1;min-width:130px;padding:9px 12px;border-radius:12px;border:none;background:var(--inset-bg);color:var(--text);box-shadow:var(--shadow-in);font-family:'Manrope',sans-serif;font-size:13px;">
+        <input type="date" id="student-to" onchange="renderStudents()" style="flex:1;min-width:130px;padding:9px 12px;border-radius:12px;border:none;background:var(--inset-bg);color:var(--text);box-shadow:var(--shadow-in);font-family:'Manrope',sans-serif;font-size:13px;">
+        <button class="btn btn-sm btn-secondary" onclick="clearDateFilter()">✕</button>
+      </div>
+      <div class="section-header">
+        <span class="section-title" id="students-count">Talabalar</span>
+        <button class="btn btn-sm btn-primary" onclick="openAddStudent()" id="btn-add-student">+ Qo'shish</button>
+      </div>
+      <div id="students-list"></div>
+    </div>
+  </div>
+
+  <!-- MY ATTENDANCE PAGE (staff only) -->
+  <div class="page" id="page-myattend">
+    <div class="page-content">
+      <div class="card" style="text-align:center;padding:24px 16px;">
+        <div class="avatar" id="my-avatar" style="width:64px;height:64px;font-size:24px;margin:0 auto 12px;">?</div>
+        <div style="font-size:18px;font-weight:700;" id="my-name">-</div>
+        <div style="font-size:13px;color:var(--text2);margin-top:2px;" id="my-position">-</div>
+        <div id="my-clock" style="font-family:'Sora',sans-serif;font-size:34px;font-weight:700;margin-top:14px;letter-spacing:1px;">--:--</div>
+        <div style="font-size:13px;color:var(--text2);" id="my-date">-</div>
+      </div>
+
+      <div id="my-state-banner" style="text-align:center;font-size:13px;font-weight:700;padding:10px;border-radius:14px;margin-bottom:14px;display:none;"></div>
+
+      <button class="btn btn-primary btn-full" id="btn-checkin" onclick="myCheck('checkin')" style="padding:18px;font-size:16px;margin-bottom:12px;">
+        ⬆ Keldim
+      </button>
+      <button class="btn btn-secondary btn-full" id="btn-checkout" onclick="myCheck('checkout')" style="padding:18px;font-size:16px;margin-bottom:14px;">
+        ⬇ Ketdim
+      </button>
+
+      <div id="my-status-box" class="card" style="display:none;">
+        <div style="font-size:13px;color:var(--text2);margin-bottom:8px;text-align:center;">Bugungi davomat</div>
+        <div id="my-today-rows"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ATTENDANCE PAGE (admin) -->
+  <div class="page" id="page-attendance">
+    <div class="page-content">
+      <div class="tabs">
+        <div class="tab active" onclick="switchAttTab('checkin')" id="att-tab-checkin">Kelish/Ketish</div>
+        <div class="tab" onclick="switchAttTab('report')" id="att-tab-report">Hisobot</div>
+        <div class="tab" onclick="switchAttTab('late')" id="att-tab-late">Kechikkan</div>
+      </div>
+      <!-- CHECK IN TAB -->
+      <div id="att-checkin">
+        <div class="section-header">
+          <span class="section-title">Bugungi holat</span>
+          <button class="btn btn-sm btn-primary" onclick="openCheckIn()">+ Belgilash</button>
+        </div>
+        <div id="today-attendance"></div>
+      </div>
+      <!-- REPORT TAB -->
+      <div id="att-report" class="hidden">
+        <div class="report-opt">
+          <button class="report-btn active" onclick="setReportPeriod('daily')" id="rp-daily">Kunlik</button>
+          <button class="report-btn" onclick="setReportPeriod('weekly')" id="rp-weekly">Haftalik</button>
+          <button class="report-btn" onclick="setReportPeriod('monthly')" id="rp-monthly">Oylik</button>
+        </div>
+        <div class="inp-group">
+          <label>Filial</label>
+          <select id="report-branch" onchange="loadReport()">
+            <option value="">Barcha filiallar</option>
+          </select>
+        </div>
+        <button class="btn btn-secondary btn-full" onclick="exportExcel()" style="margin-bottom:14px;">
+          📊 Excel yuklab olish
+        </button>
+        <div class="card" id="report-chart-card" style="display:none;">
+          <div style="font-size:14px;font-weight:700;margin-bottom:14px;text-align:center;">Xodimlar bo'yicha davomat</div>
+          <div style="display:flex;align-items:center;justify-content:center;gap:20px;flex-wrap:wrap;">
+            <svg id="donut-chart" width="180" height="180" viewBox="0 0 180 180"></svg>
+            <div id="donut-legend" style="display:flex;flex-direction:column;gap:8px;"></div>
+          </div>
+        </div>
+        <div id="report-table"></div>
+      </div>
+      <!-- LATE TAB -->
+      <div id="att-late" class="hidden">
+        <div id="late-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TASKS PAGE -->
+  <div class="page" id="page-tasks">
+    <div class="page-content">
+      <div class="section-header">
+        <span class="section-title" id="tasks-title">Vazifalar</span>
+        <button class="btn btn-sm btn-primary" onclick="openAddTask()" id="btn-add-task" style="display:none">+ Vazifa</button>
+      </div>
+      <div id="tasks-list"></div>
+    </div>
+  </div>
+
+  <!-- ADMIN PAGE -->
+  <div class="page" id="page-admin">
+    <div class="page-content">
+      <div class="tabs">
+        <div class="tab active" onclick="switchAdminTab('staff')" id="adm-tab-staff">Xodimlar</div>
+        <div class="tab" onclick="switchAdminTab('branches')" id="adm-tab-branches">Filiallar</div>
+        <div class="tab" onclick="switchAdminTab('admins')" id="adm-tab-admins">Adminlar</div>
+        <div class="tab" onclick="switchAdminTab('tags')" id="adm-tab-tags" style="display:none">Teglar</div>
+      </div>
+      <!-- STAFF -->
+      <div id="adm-staff">
+        <div class="section-header">
+          <span class="section-title">Xodimlar</span>
+          <button class="btn btn-sm btn-primary" onclick="openAddStaff()">+ Qo'shish</button>
+        </div>
+        <div id="staff-list"></div>
+      </div>
+      <!-- BRANCHES -->
+      <div id="adm-branches" class="hidden">
+        <div class="section-header">
+          <span class="section-title">Filiallar</span>
+          <button class="btn btn-sm btn-primary" onclick="openAddBranch()">+ Filial</button>
+        </div>
+        <div id="branches-list"></div>
+      </div>
+      <!-- ADMINS (super admin only) -->
+      <div id="adm-admins" class="hidden">
+        <div class="section-header">
+          <span class="section-title">Adminlar</span>
+          <button class="btn btn-sm btn-primary" onclick="openAddAdmin()">+ Admin</button>
+        </div>
+        <div id="admins-list"></div>
+      </div>
+      <!-- TAGS (super admin only) -->
+      <div id="adm-tags" class="hidden">
+        <p style="font-size:13px;color:var(--text2);margin-bottom:14px;">Kechikish va talaba holatlari uchun sabab teglarini boshqaring.</p>
+        <div id="tags-groups"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SETTINGS PAGE -->
+  <div class="page" id="page-settings">
+    <div class="page-content">
+      <div class="card">
+        <div id="profile-info" style="margin-bottom:16px;">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+            <div class="avatar" style="width:52px;height:52px;font-size:18px;" id="settings-avatar">?</div>
+            <div>
+              <div style="font-size:16px;font-weight:700;" id="settings-name">-</div>
+              <div style="font-size:13px;color:var(--text2);" id="settings-role-text">-</div>
+            </div>
+          </div>
+          <div class="inp-group">
+            <label id="lbl-fullname">To'liq ism</label>
+            <input type="text" id="edit-fullname" placeholder="Ism Familiya">
+          </div>
+          <div class="inp-group">
+            <label id="lbl-newpass">Yangi parol</label>
+            <input type="password" id="edit-password" placeholder="Yangi parol (ixtiyoriy)">
+          </div>
+          <button class="btn btn-secondary btn-full" onclick="saveProfile()" style="margin-bottom:12px;" id="lbl-save-profile">Saqlash</button>
+        </div>
+        <hr class="divider">
+        <div class="settings-row">
+          <span id="lbl-theme">Qorong'i tema</span>
+          <div class="toggle on" id="theme-toggle" onclick="toggleTheme()"></div>
+        </div>
+        <div class="settings-row">
+          <span id="lbl-notif">Bildirishnomalar</span>
+          <div class="toggle on" id="notif-toggle" onclick="toggleNotif()"></div>
+        </div>
+        <div class="settings-row">
+          <span>Til</span>
+          <div style="display:flex;gap:6px;">
+            <button class="btn btn-sm btn-secondary" onclick="setLang('uz')" id="lang-uz">UZ</button>
+            <button class="btn btn-sm btn-secondary" onclick="setLang('ru')" id="lang-ru">RU</button>
+            <button class="btn btn-sm btn-secondary" onclick="setLang('en')" id="lang-en">EN</button>
+          </div>
+        </div>
+        <hr class="divider">
+        <button class="btn btn-danger btn-full" onclick="doLogout()" style="margin-top:8px;" id="lbl-logout">Chiqish</button>
+      </div>
+
+      <div class="card">
+        <div style="font-size:13px;color:var(--text2);margin-bottom:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Texnik yordam</div>
+        <a href="tel:+998900715544" style="text-decoration:none;color:inherit;">
+          <div class="settings-row" style="cursor:pointer;">
+            <span style="display:flex;align-items:center;gap:10px;">📞 Telefon</span>
+            <span style="color:var(--accent);font-weight:700;">+998 90 071 55 44</span>
+          </div>
+        </a>
+        <a href="https://t.me/xn_prgm" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;">
+          <div class="settings-row" style="cursor:pointer;">
+            <span style="display:flex;align-items:center;gap:10px;">✈️ Telegram</span>
+            <span style="color:var(--accent);font-weight:700;">@xn_prgm</span>
+          </div>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOTTOM NAV -->
+  <div class="bottom-nav">
+    <div class="nav-item" onclick="showPage('myattend')" id="nav-myattend" style="display:none">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+      <span id="nav-lbl-myattend">Davomat</span>
+    </div>
+    <div class="nav-item" onclick="showPage('students')" id="nav-students">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      <span id="nav-lbl-students">Talabalar</span>
+    </div>
+    <div class="nav-item" onclick="showPage('attendance')" id="nav-attendance">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M9 16l2 2 4-4"/></svg>
+      <span id="nav-lbl-attend">Davomat</span>
+    </div>
+    <div class="nav-item" onclick="showPage('tasks')" id="nav-tasks" style="position:relative;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      <span id="nav-lbl-tasks">Vazifalar</span>
+      <span id="tasks-badge" style="display:none;position:absolute;top:6px;right:50%;margin-right:-22px;background:var(--red);color:#fff;font-size:10px;font-weight:800;min-width:18px;height:18px;border-radius:9px;display:none;align-items:center;justify-content:center;padding:0 5px;">0</span>
+    </div>
+    <div class="nav-item" onclick="showPage('admin')" id="nav-admin">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+      <span id="nav-lbl-admin">Boshqaruv</span>
+    </div>
+    <div class="nav-item" onclick="showPage('settings')" id="nav-settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      <span id="nav-lbl-settings">Sozlamalar</span>
+    </div>
+  </div>
+</div>
+
+<!-- MODALS -->
+
+<!-- ADD STUDENT MODAL -->
+<div class="modal-overlay" id="modal-student">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="modal-student-title">Talaba qo'shish</div>
+    <div class="inp-group">
+      <label>Ism *</label>
+      <input type="text" id="s-name" placeholder="To'liq ism" autofocus>
+    </div>
+    <div class="inp-group">
+      <label>O'qituvchi</label>
+      <div class="pill-row" id="teacher-pills"></div>
+    </div>
+    <div class="inp-group">
+      <label>Guruh</label>
+      <div class="pill-row" id="group-pills"></div>
+    </div>
+    <div class="inp-group">
+      <label>Holat *</label>
+      <div class="pill-row">
+        <button class="pill trial" onclick="selectStatus('trial')">Sinov</button>
+        <button class="pill contract" onclick="selectStatus('contract')">Shartnoma</button>
+        <button class="pill frozen" onclick="selectStatus('frozen')">Muzlatilgan</button>
+        <button class="pill returned" onclick="selectStatus('returned')">Qaytgan</button>
+        <button class="pill left" onclick="selectStatus('left')">Ketgan</button>
+      </div>
+    </div>
+    <div id="reason-extra" style="display:none">
+      <div class="inp-group">
+        <label>Sabab</label>
+        <div class="pill-row" id="student-reason-pills"></div>
+      </div>
+    </div>
+    <div id="freeze-extra" style="display:none">
+      <div class="inp-group">
+        <label>Qaytish sanasi</label>
+        <input type="date" id="s-return-date">
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:8px;">
+      <button class="btn btn-secondary" onclick="closeModal('modal-student')" style="flex:1">Bekor</button>
+      <button class="btn btn-primary" onclick="saveStudent(false)" style="flex:1">Saqlash</button>
+      <button class="btn btn-secondary" onclick="saveStudent(true)">+ Yana</button>
+    </div>
+  </div>
+</div>
+
+<!-- STUDENT DETAIL MODAL -->
+<div class="modal-overlay" id="modal-student-detail">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+      <div class="student-avatar" id="detail-avatar" style="width:54px;height:54px;font-size:20px;"></div>
+      <div>
+        <div style="font-size:18px;font-weight:700;" id="detail-name">-</div>
+        <div style="font-size:13px;color:var(--text2);" id="detail-sub">-</div>
+      </div>
+    </div>
+    <div id="detail-freeze-info" style="display:none;background:rgba(245,180,85,0.1);border:1px solid rgba(245,180,85,0.3);border-radius:12px;padding:12px;margin-bottom:16px;">
+      <div style="font-size:12px;color:var(--text2);margin-bottom:4px;">Qaytish sanasi</div>
+      <div style="font-size:16px;font-weight:700;color:var(--yellow);" id="detail-return">-</div>
+      <div class="freeze-days" id="detail-days">-</div>
+    </div>
+    <div style="font-size:13px;color:var(--text2);margin-bottom:10px;">Tezkor status o'zgartirish:</div>
+    <div class="pill-row" style="margin-bottom:20px;">
+      <button class="pill trial" onclick="quickStatus('trial')">Sinov</button>
+      <button class="pill contract" onclick="quickStatus('contract')">Shartnoma</button>
+      <button class="pill frozen" onclick="quickStatus('frozen')">Muzlatilgan</button>
+      <button class="pill returned" onclick="quickStatus('returned')">Qaytgan</button>
+      <button class="pill left" onclick="quickStatus('left')">Ketgan</button>
+    </div>
+    <div style="display:flex;gap:10px;">
+      <button class="btn btn-secondary" onclick="closeModal('modal-student-detail')" style="flex:1">Yopish</button>
+      <button class="btn btn-primary" onclick="editCurrentStudent()" style="flex:1">Tahrirlash</button>
+      <button class="btn btn-danger btn-icon" onclick="deleteCurrentStudent()">🗑</button>
+    </div>
+  </div>
+</div>
+
+<!-- CHECK IN MODAL -->
+<div class="modal-overlay" id="modal-checkin">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Kelish/Ketishni belgilash</div>
+    <div class="inp-group">
+      <label>Xodim</label>
+      <select id="ci-staff"></select>
+    </div>
+    <div class="inp-group">
+      <label>Filial</label>
+      <select id="ci-branch"></select>
+    </div>
+    <div class="inp-group">
+      <label>Tur</label>
+      <div class="pill-row">
+        <button class="pill pill-entity selected" onclick="selectCIType('checkin')">Keldi</button>
+        <button class="pill pill-entity" onclick="selectCIType('checkout')">Ketdi</button>
+      </div>
+    </div>
+    <div class="inp-group">
+      <label>Vaqt</label>
+      <input type="datetime-local" id="ci-time">
+    </div>
+    <div style="display:flex;gap:10px;margin-top:8px;">
+      <button class="btn btn-secondary" onclick="closeModal('modal-checkin')" style="flex:1">Bekor</button>
+      <button class="btn btn-primary" onclick="saveCheckIn()" style="flex:1">Saqlash</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD TASK MODAL -->
+<div class="modal-overlay" id="modal-task">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Vazifa yuklash</div>
+    <div class="inp-group">
+      <label>Sarlavha *</label>
+      <input type="text" id="t-title" placeholder="Vazifa sarlavhasi">
+    </div>
+    <div class="inp-group">
+      <label>Mazmun</label>
+      <textarea id="t-body" rows="3" placeholder="Batafsil..." style="resize:none;"></textarea>
+    </div>
+    <div class="inp-group">
+      <label>Xodim</label>
+      <select id="t-staff"></select>
+    </div>
+    <div class="inp-group">
+      <label>Tur</label>
+      <div class="pill-row">
+        <button class="pill pill-entity selected" onclick="selectTaskType('task')">Vazifa</button>
+        <button class="pill pill-entity" onclick="selectTaskType('note')">Eslatma</button>
+        <button class="pill pill-entity" onclick="selectTaskType('alert')">Xabarnoma</button>
+      </div>
+    </div>
+    <div class="inp-group">
+      <label>Muddat (ixtiyoriy)</label>
+      <input type="datetime-local" id="t-deadline">
+    </div>
+    <div style="display:flex;gap:10px;margin-top:8px;">
+      <button class="btn btn-secondary" onclick="closeModal('modal-task')" style="flex:1">Bekor</button>
+      <button class="btn btn-primary" onclick="saveTask()" style="flex:1">Yuklash</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD STAFF MODAL -->
+<div class="modal-overlay" id="modal-staff">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="modal-staff-title">Xodim qo'shish</div>
+    <div class="inp-group">
+      <label>To'liq ism *</label>
+      <input type="text" id="st-name" placeholder="Ism Familiya">
+    </div>
+    <div class="inp-group">
+      <label>Login *</label>
+      <input type="text" id="st-login" placeholder="login">
+    </div>
+    <div class="inp-group">
+      <label>Parol *</label>
+      <input type="password" id="st-password" placeholder="Parol">
+    </div>
+    <div class="inp-group">
+      <label>Lavozim</label>
+      <input type="text" id="st-position" placeholder="Masalan: O'qituvchi">
+    </div>
+    <div class="inp-group">
+      <label>Filial</label>
+      <select id="st-branch"></select>
+    </div>
+    <div class="inp-group">
+      <label>Ish vaqtlari va kunlari</label>
+      <p style="font-size:11px;color:var(--text3);margin:-4px 0 8px;">Har bir smena uchun vaqt va kunlarni tanlang. Masalan: Dushanba 10:00–12:00, Seshanba 18:00–20:00.</p>
+      <div id="shifts-container"></div>
+      <button class="btn btn-sm btn-secondary" onclick="addShiftRow()" style="margin-top:8px;">+ Vaqt qo'shish</button>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:8px;">
+      <button class="btn btn-secondary" onclick="closeModal('modal-staff')" style="flex:1">Bekor</button>
+      <button class="btn btn-primary" onclick="saveStaff()" style="flex:1">Saqlash</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD BRANCH MODAL -->
+<div class="modal-overlay" id="modal-branch">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Filial qo'shish</div>
+    <div class="inp-group">
+      <label>Filial nomi *</label>
+      <input type="text" id="br-name" placeholder="Masalan: Chilonzor filiali">
+    </div>
+    <div class="inp-group">
+      <label>Manzil</label>
+      <input type="text" id="br-address" placeholder="Manzil">
+    </div>
+    <div class="inp-group">
+      <label>Joylashuv (GPS) *</label>
+      <button class="btn btn-secondary btn-full" onclick="grabBranchLocation(this)" id="br-loc-btn" style="margin-bottom:8px;">📍 Hozirgi joyni olish</button>
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="br-lat" placeholder="Kenglik (lat)" inputmode="decimal" style="flex:1;">
+        <input type="text" id="br-lng" placeholder="Uzunlik (lng)" inputmode="decimal" style="flex:1;">
+      </div>
+      <div id="br-loc-status" style="font-size:12px;color:var(--text2);margin-top:6px;"></div>
+    </div>
+    <div class="inp-group">
+      <label>Radius (metr)</label>
+      <input type="number" id="br-radius" placeholder="100" value="100" inputmode="numeric">
+    </div>
+    <div style="display:flex;gap:10px;margin-top:8px;">
+      <button class="btn btn-secondary" onclick="closeModal('modal-branch')" style="flex:1">Bekor</button>
+      <button class="btn btn-primary" onclick="saveBranch()" style="flex:1">Saqlash</button>
+    </div>
+  </div>
+</div>
+
+<!-- TASK DETAIL MODAL -->
+<div class="modal-overlay" id="modal-task-detail">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div id="task-detail-content"></div>
+    <div class="inp-group" id="reply-section">
+      <label>Javob yozish</label>
+      <textarea id="reply-input" rows="2" placeholder="Javobingiz..." style="resize:none;"></textarea>
+      <button class="btn btn-primary btn-full" onclick="sendReply()" style="margin-top:8px;">Yuborish</button>
+    </div>
+    <button class="btn btn-secondary btn-full" onclick="closeModal('modal-task-detail')" style="margin-top:8px;">Yopish</button>
+  </div>
+</div>
+
+<!-- ADD ADMIN MODAL -->
+<div class="modal-overlay" id="modal-admin">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Admin qo'shish</div>
+    <div class="inp-group">
+      <label>To'liq ism *</label>
+      <input type="text" id="adm-name" placeholder="Ism Familiya">
+    </div>
+    <div class="inp-group">
+      <label>Login *</label>
+      <input type="text" id="adm-login" placeholder="login">
+    </div>
+    <div class="inp-group">
+      <label>Parol *</label>
+      <input type="password" id="adm-password" placeholder="Parol">
+    </div>
+    <div class="inp-group">
+      <label>Ruxsatlar</label>
+      <div style="display:flex;flex-direction:column;gap:8px;" id="perm-checks">
+        <label style="display:flex;align-items:center;gap:8px;font-size:14px;"><input type="checkbox" id="perm-add-staff" checked> Xodim qo'shish/o'chirish</label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:14px;"><input type="checkbox" id="perm-tasks" checked> Vazifa belgilash</label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:14px;"><input type="checkbox" id="perm-reports" checked> Hisobot olish</label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:14px;"><input type="checkbox" id="perm-students" checked> Talabalar boshqarish</label>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:8px;">
+      <button class="btn btn-secondary" onclick="closeModal('modal-admin')" style="flex:1">Bekor</button>
+      <button class="btn btn-primary" onclick="saveAdmin()" style="flex:1">Saqlash</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// CONFIG — Supabase
+// ============================================================
+const SUPABASE_URL = 'https://ovqzfqklulgfwmpxmjaa.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im92cXpmcWtsdWxnZndtcHhtamFhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE0MzcyNTUsImV4cCI6MjA5NzAxMzI1NX0.z5sPn_hN3GfDxqp2WKw_y4qUm7vd27oKgi16aSykgi0';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ============================================================
+// STATE
+// ============================================================
+let currentUser = null;
+let students = [], teachers = [], groups = [], staffList = [], branches = [], tasks = [], attendances = [], admins = [];
+let selectedStatus = null, selectedReason = null, selectedTeacher = null, selectedGroup = null;
+let selectedCIType = 'checkin', selectedTaskType = 'task';
+let currentStudentId = null, currentTaskId = null, currentEditStaffId = null;
+let filterStatusActive = null;
+let reportPeriod = 'daily';
+let notifEnabled = true;
+let lang = localStorage.getItem('lang') || 'uz';
+
+// TRANSLATIONS
+const T = {
+  uz: {
+    students:'Talabalar', attend:'Davomat', tasks:'Vazifalar', mgmt:'Boshqaruv', settings:'Sozlamalar',
+    trial:'Sinov', contract:'Shartnoma', frozen:'Muzlatilgan', left:'Ketgan', returned:'Qaytgan',
+    add:'Qo\'shish', save:'Saqlash', cancel:'Bekor', close:'Yopish', edit:'Tahrirlash', del:'O\'chirish',
+    login:'Login', pass:'Parol', enter:'Kirish', logout:'Chiqish',
+    theme:'Qorong\'i tema', notif:'Bildirishnomalar',
+    fullname:'To\'liq ism', newpass:'Yangi parol',
+    save_profile:'Saqlash', checkin:'Keldi', checkout:'Ketdi',
+    search:'Qidirish...', daily:'Kunlik', weekly:'Haftalik', monthly:'Oylik',
+    task:'Vazifa', note:'Eslatma', alert:'Xabarnoma',
+    branch:'Filial', staff:'Xodim', reply:'Javob',
+    late:'Kechikkan', on_time:'Vaqtida', no_data:'Ma\'lumot yo\'q',
+    saved:'✓ Saqlandi', deleted:'🗑 O\'chirildi', error:'Xatolik yuz berdi',
+    auth_sub:'O\'quv markazi boshqaruv tizimi', wrong_creds:'Login yoki parol noto\'g\'ri'
+  },
+  ru: {
+    students:'Ученики', attend:'Посещаемость', tasks:'Задачи', mgmt:'Управление', settings:'Настройки',
+    trial:'Пробный', contract:'Договор', frozen:'Заморожен', left:'Ушёл', returned:'Вернулся',
+    add:'Добавить', save:'Сохранить', cancel:'Отмена', close:'Закрыть', edit:'Изменить', del:'Удалить',
+    login:'Логин', pass:'Пароль', enter:'Войти', logout:'Выйти',
+    theme:'Тёмная тема', notif:'Уведомления',
+    fullname:'Полное имя', newpass:'Новый пароль',
+    save_profile:'Сохранить', checkin:'Пришёл', checkout:'Ушёл',
+    search:'Поиск...', daily:'Ежедневно', weekly:'Еженедельно', monthly:'Ежемесячно',
+    task:'Задача', note:'Заметка', alert:'Уведомление',
+    branch:'Филиал', staff:'Сотрудник', reply:'Ответ',
+    late:'Опоздавшие', on_time:'Вовремя', no_data:'Нет данных',
+    saved:'✓ Сохранено', deleted:'🗑 Удалено', error:'Произошла ошибка',
+    auth_sub:'Система управления учебным центром', wrong_creds:'Неверный логин или пароль'
+  },
+  en: {
+    students:'Students', attend:'Attendance', tasks:'Tasks', mgmt:'Management', settings:'Settings',
+    trial:'Trial', contract:'Contract', frozen:'Frozen', left:'Left', returned:'Returned',
+    add:'Add', save:'Save', cancel:'Cancel', close:'Close', edit:'Edit', del:'Delete',
+    login:'Login', pass:'Password', enter:'Enter', logout:'Logout',
+    theme:'Dark theme', notif:'Notifications',
+    fullname:'Full name', newpass:'New password',
+    save_profile:'Save', checkin:'Checked in', checkout:'Checked out',
+    search:'Search...', daily:'Daily', weekly:'Weekly', monthly:'Monthly',
+    task:'Task', note:'Note', alert:'Notification',
+    branch:'Branch', staff:'Staff', reply:'Reply',
+    late:'Late', on_time:'On time', no_data:'No data',
+    saved:'✓ Saved', deleted:'🗑 Deleted', error:'An error occurred',
+    auth_sub:'Learning Center Management System', wrong_creds:'Wrong login or password'
+  }
+};
+
+function t(key) { return (T[lang] && T[lang][key]) || key; }
+
+function setLang(l) {
+  lang = l;
+  localStorage.setItem('lang', l);
+  applyLang();
+}
+
+function applyLang() {
+  document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
+  const lb = document.querySelector(`.lang-btn[onclick="setLang('${lang}')"]`);
+  if (lb) lb.classList.add('active');
+  document.getElementById('auth-subtitle').textContent = t('auth_sub');
+  document.getElementById('lbl-login').textContent = t('login');
+  document.getElementById('lbl-pass').textContent = t('pass');
+  document.getElementById('lbl-enter').textContent = t('enter');
+  document.getElementById('nav-lbl-students').textContent = t('students');
+  const myAttLbl = document.getElementById('nav-lbl-myattend');
+  if (myAttLbl) myAttLbl.textContent = t('attend');
+  document.getElementById('nav-lbl-attend').textContent = t('attend');
+  document.getElementById('nav-lbl-tasks').textContent = t('tasks');
+  document.getElementById('nav-lbl-admin').textContent = t('mgmt');
+  document.getElementById('nav-lbl-settings').textContent = t('settings');
+  document.getElementById('sl-trial').textContent = t('trial');
+  document.getElementById('sl-contract').textContent = t('contract');
+  document.getElementById('sl-frozen').textContent = t('frozen');
+  document.getElementById('sl-left').textContent = t('left');
+  document.getElementById('lbl-theme').textContent = t('theme');
+  document.getElementById('lbl-notif').textContent = t('notif');
+  document.getElementById('lbl-fullname').textContent = t('fullname');
+  document.getElementById('lbl-newpass').textContent = t('newpass');
+  document.getElementById('lbl-save-profile').textContent = t('save_profile');
+  document.getElementById('lbl-logout').textContent = t('logout');
+  if (currentUser) {
+    document.getElementById('lbl-enter') && null;
+    renderStudents(); renderTasks(); renderTodayAttendance();
+  }
+}
+
+// ============================================================
+// THEME
+// ============================================================
+function toggleTheme() {
+  const goingDark = !document.body.classList.contains('dark');
+  if (goingDark) { document.body.classList.add('dark'); localStorage.setItem('theme','dark'); }
+  else { document.body.classList.remove('dark'); localStorage.setItem('theme','light'); }
+  const tog = document.getElementById('theme-toggle');
+  if (tog) tog.classList.toggle('on', goingDark);
+  const tb = document.querySelector('.top-bar button');
+  if (tb) tb.textContent = goingDark ? '☀' : '🌙';
+}
+function initTheme() {
+  const saved = localStorage.getItem('theme');
+  const tog = document.getElementById('theme-toggle');
+  const tb = document.querySelector('.top-bar button');
+  if (saved === 'dark') {
+    document.body.classList.add('dark');
+    if (tog) tog.classList.add('on');
+    if (tb) tb.textContent = '☀';
+  } else {
+    document.body.classList.remove('dark');
+    if (tog) tog.classList.remove('on');
+    if (tb) tb.textContent = '🌙';
+  }
+}
+
+function toggleNotif() {
+  notifEnabled = !notifEnabled;
+  document.getElementById('notif-toggle').classList.toggle('on', notifEnabled);
+}
+
+// ============================================================
+// TOAST
+// ============================================================
+let _toastTimer = null;
+function showToast(msg, dur=2000, kind='') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.remove('warn','ok');
+  if (kind) el.classList.add(kind);
+  el.classList.add('show');
+  if (_toastTimer) clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => el.classList.remove('show'), dur);
+}
+
+// ============================================================
+// LOADER
+// ============================================================
+let loaderCount = 0;
+function showLoader(text) {
+  loaderCount++;
+  const ov = document.getElementById('loader-overlay');
+  document.getElementById('loader-text').textContent = text || 'Yuklanmoqda...';
+  ov.classList.add('show');
+}
+function hideLoader() {
+  loaderCount = Math.max(0, loaderCount - 1);
+  if (loaderCount === 0) document.getElementById('loader-overlay').classList.remove('show');
+}
+// Tugmani spinner holatiga o'tkazish; tiklash funksiyasini qaytaradi
+function btnLoading(btn) {
+  if (!btn) return () => {};
+  const orig = btn.innerHTML;
+  const disabled = btn.disabled;
+  btn.classList.add('loading'); btn.disabled = true;
+  btn.innerHTML = '<span class="btn-spinner"></span>';
+  return () => { btn.classList.remove('loading'); btn.disabled = disabled; btn.innerHTML = orig; };
+}
+// Wrapper: async amalni loader bilan o'rab bajarish
+async function withLoader(text, fn) {
+  showLoader(text);
+  try { return await fn(); }
+  finally { hideLoader(); }
+}
+
+// ============================================================
+// AUTH — uses local users table (staff/admins)
+// ============================================================
+async function doLogin() {
+  const login = document.getElementById('login-input').value.trim();
+  const pass = document.getElementById('pass-input').value.trim();
+  if (!login || !pass) return;
+  const loginBtn = document.querySelector('#auth-screen .btn-primary');
+  const restore = btnLoading(loginBtn);
+  document.getElementById('auth-error').style.display = 'none';
+
+  try {
+    // Try super admin hardcoded (demo)
+    if (login === 'superadmin' && pass === 'super123') {
+      currentUser = { id: 'superadmin', name: 'Super Admin', role: 'superadmin', login: 'superadmin', permissions: { add_staff:true, tasks:true, reports:true, students:true } };
+      afterLogin();
+      return;
+    }
+
+    // Query staff table
+    const { data: staffData } = await sb.from('staff').select('*').eq('login', login).eq('password', pass).single();
+    if (staffData) {
+      currentUser = { ...staffData, role: staffData.role || 'staff' };
+      afterLogin();
+      return;
+    }
+
+    // Query admins table
+    const { data: adminData } = await sb.from('admins').select('*').eq('login', login).eq('password', pass).single();
+    if (adminData) {
+      currentUser = { ...adminData, role: 'admin' };
+      afterLogin();
+      return;
+    }
+
+    document.getElementById('auth-error').textContent = t('wrong_creds');
+    document.getElementById('auth-error').style.display = 'block';
+  } catch (e) {
+    document.getElementById('auth-error').textContent = t('wrong_creds');
+    document.getElementById('auth-error').style.display = 'block';
+  } finally {
+    restore();
+  }
+}
+
+let taskPollTimer = null;
+function afterLogin() {
+  localStorage.setItem('session', JSON.stringify(currentUser));
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('main-app').style.display = 'block';
+  setupUI();
+  withLoader('Ma\'lumotlar yuklanmoqda...', () => loadAll());
+  // Bildirishnoma ruxsatini so'rash
+  if ('Notification' in window && Notification.permission === 'default') {
+    setTimeout(() => { try { Notification.requestPermission(); } catch(e){} }, 2000);
+  }
+  // Yangi vazifalarni davriy tekshirish (har 30 soniya)
+  if (taskPollTimer) clearInterval(taskPollTimer);
+  taskPollTimer = setInterval(() => { loadTasks(); }, 30000);
+}
+
+function doLogout() {
+  if (myClockTimer) clearInterval(myClockTimer);
+  if (taskPollTimer) clearInterval(taskPollTimer);
+  localStorage.removeItem('session');
+  currentUser = null;
+  location.reload();
+}
+
+async function saveProfile() {
+  const name = document.getElementById('edit-fullname').value.trim();
+  const pass = document.getElementById('edit-password').value.trim();
+  if (!name) return;
+  if (currentUser.role === 'superadmin') {
+    currentUser.name = name;
+    updateProfileDisplay();
+    showToast(t('saved'));
+    return;
+  }
+  const update = { name };
+  if (pass) update.password = pass;
+  const table = currentUser.role === 'admin' ? 'admins' : 'staff';
+  await withLoader(t('save')+'...', async () => {
+    await sb.from(table).update(update).eq('id', currentUser.id);
+  });
+  currentUser = { ...currentUser, ...update };
+  localStorage.setItem('session', JSON.stringify(currentUser));
+  updateProfileDisplay();
+  showToast(t('saved'));
+}
+
+function updateProfileDisplay() {
+  const initials = currentUser.name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+  document.getElementById('user-avatar').textContent = initials;
+  document.getElementById('settings-avatar').textContent = initials;
+  document.getElementById('settings-name').textContent = currentUser.name;
+  document.getElementById('settings-role-text').textContent = currentUser.role === 'superadmin' ? 'Super Admin' : currentUser.role === 'admin' ? 'Admin' : 'Xodim';
+  document.getElementById('edit-fullname').value = currentUser.name;
+  const rb = document.getElementById('user-role-badge');
+  rb.innerHTML = `<span class="role-badge ${currentUser.role==='superadmin'?'role-super':currentUser.role==='admin'?'role-admin':'role-staff'}">${currentUser.role==='superadmin'?'Super Admin':currentUser.role==='admin'?'Admin':'Staff'}</span>`;
+}
+
+function setupUI() {
+  updateProfileDisplay();
+  // Faqat aniq admin yoki superadmin to'liq panel ko'radi; qolgan hamma — xodim
+  const isStaff = currentUser.role !== 'admin' && currentUser.role !== 'superadmin';
+
+  if (isStaff) {
+    // Xodim faqat: Davomatim + Vazifalar + Sozlamalar
+    document.getElementById('nav-myattend').style.display = '';
+    document.getElementById('nav-students').style.display = 'none';
+    document.getElementById('nav-attendance').style.display = 'none';
+    document.getElementById('nav-admin').style.display = 'none';
+    document.getElementById('nav-tasks').style.display = '';
+    document.getElementById('nav-settings').style.display = '';
+    document.getElementById('btn-add-task').style.display = 'none';
+    try { setupMyAttendance(); } catch (e) { console.warn('setupMyAttendance:', e); }
+  } else {
+    // Admin / Super admin — to'liq panel
+    document.getElementById('nav-myattend').style.display = 'none';
+    document.getElementById('nav-students').style.display = '';
+    document.getElementById('nav-attendance').style.display = '';
+    document.getElementById('nav-admin').style.display = '';
+    document.getElementById('btn-add-task').style.display = '';
+    // Admin uchun talabalar ruxsati (super admin doim ko'radi)
+    if (currentUser.role === 'admin') {
+      const perm = currentUser.permissions || {};
+      document.getElementById('nav-students').style.display = perm.students !== false ? '' : 'none';
+      document.getElementById('btn-add-student').style.display = perm.students !== false ? '' : 'none';
+    }
+    if (currentUser.role === 'superadmin') {
+      document.getElementById('adm-tab-admins').style.display = '';
+      document.getElementById('adm-tab-tags').style.display = '';
+    } else {
+      document.getElementById('adm-tab-admins').style.display = 'none';
+      document.getElementById('adm-admins').classList.add('hidden');
+    }
+  }
+
+  initTheme();
+  applyLang();
+
+  // Boshlang'ich sahifa
+  showPage(isStaff ? 'myattend' : 'students');
+}
+
+// ============================================================
+// NAVIGATION
+// ============================================================
+function showPage(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const pageEl = document.getElementById('page-' + page);
+  const navEl = document.getElementById('nav-' + page);
+  if (pageEl) pageEl.classList.add('active');
+  if (navEl) navEl.classList.add('active');
+  const titles = { myattend: t('attend'), students: t('students'), attendance: t('attend'), tasks: t('tasks'), admin: t('mgmt'), settings: t('settings') };
+  const titleEl = document.getElementById('page-title');
+  if (titleEl) titleEl.textContent = titles[page] || '';
+  if (page === 'myattend') refreshMyAttendance();
+  if (page === 'attendance') { loadAttendance(); loadLate(); }
+  if (page === 'tasks') { renderTasks(); markTasksSeen(); }
+  if (page === 'admin') { renderStaff(); renderBranches(); renderAdmins(); }
+}
+
+// ============================================================
+// LOAD DATA
+// ============================================================
+async function loadAll() {
+  await Promise.all([loadStudents(), loadTeachers(), loadGroups(), loadStaff(), loadBranches(), loadTasks(), loadAdmins(), loadTags()]);
+}
+
+let appTags = [];
+async function loadTags() {
+  const { data } = await sb.from('app_tags').select('*').order('sort');
+  appTags = data || [];
+}
+function tagsByKind(kind) { return appTags.filter(t => t.kind === kind); }
+
+async function loadStudents() {
+  const { data } = await sb.from('students').select('*').order('created_at', { ascending: false });
+  students = data || [];
+  renderStudents();
+  updateStats();
+}
+
+async function loadTeachers() {
+  const { data } = await sb.from('teachers').select('*').order('name');
+  teachers = data || [];
+}
+
+async function loadGroups() {
+  const { data } = await sb.from('groups').select('*').order('name');
+  groups = data || [];
+}
+
+async function loadStaff() {
+  const { data } = await sb.from('staff').select('*').order('name');
+  staffList = data || [];
+  populateStaffSelects();
+}
+
+async function loadBranches() {
+  const { data } = await sb.from('branches').select('*').order('name');
+  branches = data || [];
+  populateBranchSelects();
+}
+
+async function loadTasks() {
+  let query = sb.from('tasks').select('*').order('created_at', { ascending: false });
+  const isAdminRole = currentUser.role === 'admin' || currentUser.role === 'superadmin';
+  if (!isAdminRole) {
+    query = query.eq('assigned_to', currentUser.id);
+  }
+  const { data } = await query;
+  const prevIds = tasks.map(t => t.id);
+  tasks = data || [];
+  // Yangi kelgan vazifalarni aniqlash (oldingi yuklashga nisbatan)
+  if (prevIds.length) {
+    const fresh = tasks.filter(t => !prevIds.includes(t.id));
+    fresh.forEach(t => notifyNewTask(t));
+  }
+  renderTasks();
+  updateTasksBadge();
+}
+
+// Ko'rilgan vazifalar (localStorage)
+function seenTaskIds() {
+  try { return JSON.parse(localStorage.getItem('seenTasks_' + currentUser.id) || '[]'); }
+  catch { return []; }
+}
+function markTasksSeen() {
+  localStorage.setItem('seenTasks_' + currentUser.id, JSON.stringify(tasks.map(t => t.id)));
+  updateTasksBadge();
+}
+function updateTasksBadge() {
+  const seen = seenTaskIds();
+  const unseen = tasks.filter(t => !seen.includes(t.id)).length;
+  const badge = document.getElementById('tasks-badge');
+  if (!badge) return;
+  if (unseen > 0) {
+    badge.textContent = unseen > 9 ? '9+' : unseen;
+    badge.style.display = 'flex';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+// Yangi vazifa bildirishnomasi
+function notifyNewTask(task) {
+  const typeLabel = { task:'Yangi vazifa', note:'Yangi eslatma', alert:'Yangi xabarnoma' }[task.type] || 'Yangi vazifa';
+  showToast(`📬 ${typeLabel}: ${task.title}`, 4000, 'ok');
+  // Brauzer bildirishnomasi (ruxsat berilgan bo'lsa)
+  if ('Notification' in window && Notification.permission === 'granted') {
+    try { new Notification(typeLabel, { body: task.title, icon: 'icon-192.png' }); } catch(e){}
+  }
+}
+
+async function loadAdmins() {
+  if (currentUser.role !== 'superadmin') return;
+  const { data } = await sb.from('admins').select('*').order('name');
+  admins = data || [];
+}
+
+async function loadAttendance() {
+  const today = new Date().toISOString().split('T')[0];
+  const { data } = await sb.from('attendance').select('*').gte('time', today + 'T00:00:00').order('time', { ascending: false });
+  attendances = data || [];
+  renderTodayAttendance();
+}
+
+async function loadLate() {
+  const { data } = await sb.from('attendance').select('*').eq('type','checkin').order('time', { ascending: false }).limit(100);
+  renderLate(data || []);
+}
+
+// ============================================================
+// STUDENTS
+// ============================================================
+function filterStatus(s) {
+  if (filterStatusActive === s) { filterStatusActive = null; }
+  else { filterStatusActive = s; }
+  document.querySelectorAll('.stat-card').forEach(c => c.classList.remove('active'));
+  if (filterStatusActive) {
+    const map = { trial:'stat-trial', contract:'stat-contract', frozen:'stat-frozen', left:'stat-left', returned:'stat-returned' };
+    document.getElementById(map[s])?.classList.add('active');
+  }
+  document.getElementById('filter-clear').style.display = filterStatusActive ? '' : 'none';
+  renderStudents();
+}
+
+function clearFilter() { filterStatusActive = null; document.querySelectorAll('.stat-card').forEach(c => c.classList.remove('active')); document.getElementById('filter-clear').style.display='none'; renderStudents(); }
+function clearDateFilter() { document.getElementById('student-from').value=''; document.getElementById('student-to').value=''; renderStudents(); }
+
+function updateStats() {
+  const counts = { trial:0, contract:0, frozen:0, left:0, returned:0 };
+  students.forEach(s => { if (counts[s.status] !== undefined) counts[s.status]++; });
+  document.getElementById('cnt-trial').textContent = counts.trial;
+  document.getElementById('cnt-contract').textContent = counts.contract;
+  document.getElementById('cnt-frozen').textContent = counts.frozen;
+  document.getElementById('cnt-left').textContent = counts.left;
+  const rt = document.getElementById('cnt-returned');
+  if (rt) rt.textContent = counts.returned;
+}
+
+function renderStudents() {
+  const search = document.getElementById('student-search')?.value.toLowerCase() || '';
+  const fromV = document.getElementById('student-from')?.value || '';
+  const toV = document.getElementById('student-to')?.value || '';
+  const fromTs = fromV ? new Date(fromV + 'T00:00:00').getTime() : null;
+  const toTs = toV ? new Date(toV + 'T23:59:59').getTime() : null;
+  let filtered = students.filter(s => {
+    const matchSearch = !search || s.name.toLowerCase().includes(search) || (s.group_name||'').toLowerCase().includes(search) || (s.teacher||'').toLowerCase().includes(search);
+    const matchStatus = !filterStatusActive || s.status === filterStatusActive;
+    let matchDate = true;
+    if (fromTs || toTs) {
+      const ct = s.created_at ? new Date(s.created_at).getTime() : 0;
+      if (fromTs && ct < fromTs) matchDate = false;
+      if (toTs && ct > toTs) matchDate = false;
+    }
+    return matchSearch && matchStatus && matchDate;
+  });
+  document.getElementById('students-count').textContent = `${t('students')} (${filtered.length})`;
+  const list = document.getElementById('students-list');
+  if (!filtered.length) { list.innerHTML = `<div class="empty"><div class="empty-icon">👥</div><h3>${t('no_data')}</h3></div>`; return; }
+  list.innerHTML = filtered.map(s => {
+    const initials = s.name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+    const colors = { trial:'rgba(79,184,154,0.18)', contract:'rgba(108,124,224,0.18)', frozen:'rgba(224,162,60,0.18)', left:'rgba(224,107,124,0.18)', returned:'rgba(95,196,166,0.18)' };
+    const textColors = { trial:'#3a9e82', contract:'#5b6bd0', frozen:'#c4842c', left:'#d05568', returned:'#3a9e82' };
+    let freezeInfo = '';
+    if (s.status === 'frozen' && s.return_date) {
+      const days = Math.ceil((new Date(s.return_date) - new Date()) / 86400000);
+      const cls = days > 7 ? 'green' : days > 2 ? 'yellow' : 'red';
+      freezeInfo = `<span class="freeze-days ${cls}" style="font-size:13px;">${days>0?days+' kun':'Tugadi'}</span>`;
+    }
+    const addedDate = s.created_at ? new Date(s.created_at).toLocaleDateString('uz-UZ', {day:'numeric',month:'short',year:'numeric'}) : '';
+    const reasonTag = s.freeze_reason ? `<span style="font-size:10px;color:var(--text3);">• ${s.freeze_reason}</span>` : '';
+    return `<div class="student-card" onclick="openStudentDetail('${s.id}')">
+      <div class="student-avatar" style="background:${colors[s.status]};color:${textColors[s.status]}">${initials}</div>
+      <div class="student-info">
+        <div class="student-name">${s.name}</div>
+        <div class="student-sub">${s.teacher||''} ${s.group_name?'• '+s.group_name:''}</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:2px;">📅 ${addedDate} ${reasonTag}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+        <span class="status-badge s-${s.status}">${t(s.status)}</span>
+        ${freezeInfo}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openAddStudent() {
+  selectedStatus = null; selectedReason = null;
+  currentStudentId = null;
+  document.getElementById('s-name').value = '';
+  document.getElementById('s-return-date').value = '';
+  document.getElementById('freeze-extra').style.display = 'none';
+  const re = document.getElementById('reason-extra'); if (re) re.style.display = 'none';
+  document.getElementById('modal-student-title').textContent = 'Talaba qo\'shish';
+  buildTeacherPills(); buildGroupPills();
+  document.querySelectorAll('#modal-student .pill').forEach(p => p.classList.remove('selected'));
+  openModal('modal-student');
+  setTimeout(() => document.getElementById('s-name').focus(), 300);
+}
+
+function buildTeacherPills() {
+  const c = document.getElementById('teacher-pills');
+  c.innerHTML = teachers.map(t => `<button class="pill pill-entity${selectedTeacher===t.id?' selected':''}" onclick="selectTeacher('${t.id}')">${t.name}</button>`).join('');
+}
+function buildGroupPills() {
+  const c = document.getElementById('group-pills');
+  c.innerHTML = groups.map(g => `<button class="pill pill-entity${selectedGroup===g.id?' selected':''}" onclick="selectGroup('${g.id}')">${g.name}</button>`).join('');
+}
+
+function selectTeacher(id) { selectedTeacher = id; buildTeacherPills(); localStorage.setItem('lastTeacher', id); }
+function selectGroup(id) { selectedGroup = id; buildGroupPills(); localStorage.setItem('lastGroup', id); }
+function selectStatus(s) {
+  selectedStatus = s;
+  selectedReason = null;
+  document.querySelectorAll('#modal-student .pill:not(.pill-entity)').forEach(p => p.classList.remove('selected'));
+  event.target.classList.add('selected');
+  // Sabab teglari (frozen, left, returned, trial, contract uchun)
+  const reasonTags = tagsByKind(s);
+  const reasonBox = document.getElementById('reason-extra');
+  const pills = document.getElementById('student-reason-pills');
+  if (reasonTags.length) {
+    reasonBox.style.display = '';
+    pills.innerHTML = reasonTags.map(tg => `<button class="pill pill-entity" onclick="selectReason('${tg.label.replace(/'/g,"\\'")}')">${tg.label}</button>`).join('');
+  } else {
+    reasonBox.style.display = 'none';
+    pills.innerHTML = '';
+  }
+  // Qaytish sanasi faqat muzlatilgan uchun
+  document.getElementById('freeze-extra').style.display = s === 'frozen' ? '' : 'none';
+}
+function selectReason(r) { selectedReason = r; document.querySelectorAll('#student-reason-pills .pill').forEach(p=>p.classList.remove('selected')); event.target.classList.add('selected'); }
+
+async function saveStudent(keepOpen) {
+  const name = document.getElementById('s-name').value.trim();
+  if (!name || !selectedStatus) { showToast('Ism va holat kerak!'); return; }
+  const teacher = teachers.find(t=>t.id===selectedTeacher);
+  const group = groups.find(g=>g.id===selectedGroup);
+  const obj = {
+    name, status: selectedStatus,
+    teacher: teacher?.name || null,
+    group_name: group?.name || null,
+    freeze_reason: selectedReason || null,
+    return_date: document.getElementById('s-return-date').value || null
+  };
+  await withLoader(t('save')+'...', async () => {
+    if (currentStudentId) {
+      await sb.from('students').update(obj).eq('id', currentStudentId);
+    } else {
+      await sb.from('students').insert([obj]);
+    }
+    await loadStudents();
+  });
+  showToast(t('saved'));
+  if (!keepOpen) closeModal('modal-student');
+  else { document.getElementById('s-name').value = ''; selectedStatus = null; document.querySelectorAll('#modal-student .pill').forEach(p=>p.classList.remove('selected')); document.getElementById('freeze-extra').style.display='none'; document.getElementById('s-name').focus(); }
+}
+
+function openStudentDetail(id) {
+  const s = students.find(x=>x.id===id);
+  if (!s) return;
+  currentStudentId = id;
+  const initials = s.name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+  const colors = { trial:'rgba(79,184,154,0.18)', contract:'rgba(108,124,224,0.18)', frozen:'rgba(224,162,60,0.18)', left:'rgba(224,107,124,0.18)', returned:'rgba(95,196,166,0.18)' };
+  const textColors = { trial:'#3a9e82', contract:'#5b6bd0', frozen:'#c4842c', left:'#d05568', returned:'#3a9e82' };
+  document.getElementById('detail-avatar').style.background = colors[s.status];
+  document.getElementById('detail-avatar').style.color = textColors[s.status];
+  document.getElementById('detail-avatar').textContent = initials;
+  document.getElementById('detail-name').textContent = s.name;
+  const added = s.created_at ? new Date(s.created_at).toLocaleDateString('uz-UZ',{day:'numeric',month:'long',year:'numeric'}) : '';
+  const parts = [];
+  if (s.teacher) parts.push(s.teacher);
+  if (s.group_name) parts.push(s.group_name);
+  if (s.freeze_reason) parts.push('Sabab: ' + s.freeze_reason);
+  document.getElementById('detail-sub').innerHTML = parts.join(' • ') + (added?`<div style="font-size:11px;color:var(--text3);margin-top:4px;">📅 Qo'shilgan: ${added}</div>`:'');
+  const fi = document.getElementById('detail-freeze-info');
+  if (s.status === 'frozen' && s.return_date) {
+    fi.style.display = '';
+    document.getElementById('detail-return').textContent = s.return_date;
+    const days = Math.ceil((new Date(s.return_date) - new Date()) / 86400000);
+    const el = document.getElementById('detail-days');
+    el.textContent = days > 0 ? days + ' kun qoldi' : 'Muddati tugagan';
+    el.className = 'freeze-days ' + (days > 7 ? 'green' : days > 2 ? 'yellow' : 'red');
+  } else { fi.style.display = 'none'; }
+  openModal('modal-student-detail');
+}
+
+async function quickStatus(s) {
+  if (!currentStudentId) return;
+  await withLoader(t('save')+'...', async () => {
+    await sb.from('students').update({ status: s }).eq('id', currentStudentId);
+    await loadStudents();
+  });
+  showToast(t('saved'));
+  closeModal('modal-student-detail');
+}
+
+function editCurrentStudent() {
+  const s = students.find(x=>x.id===currentStudentId);
+  if (!s) return;
+  closeModal('modal-student-detail');
+  selectedStatus = s.status;
+  selectedTeacher = teachers.find(t=>t.name===s.teacher)?.id || null;
+  selectedGroup = groups.find(g=>g.name===s.group_name)?.id || null;
+  selectedReason = s.freeze_reason;
+  document.getElementById('s-name').value = s.name;
+  document.getElementById('s-return-date').value = s.return_date || '';
+  document.getElementById('modal-student-title').textContent = 'Tahrirlash';
+  buildTeacherPills(); buildGroupPills();
+  document.querySelectorAll('#modal-student .pill').forEach(p=>{
+    if (p.classList.contains(s.status) && !p.classList.contains('pill-entity')) p.classList.add('selected');
+  });
+  document.getElementById('freeze-extra').style.display = s.status === 'frozen' ? '' : 'none';
+  openModal('modal-student');
+}
+
+async function deleteCurrentStudent() {
+  if (!currentStudentId) return;
+  if (!confirm('O\'chirilsinmi?')) return;
+  await withLoader(t('del')+'...', async () => {
+    await sb.from('students').delete().eq('id', currentStudentId);
+    await loadStudents();
+  });
+  showToast(t('deleted'));
+  closeModal('modal-student-detail');
+}
+
+// ============================================================
+// GEOLOCATION (GPS geofence)
+// ============================================================
+const GEOFENCE_DEFAULT_RADIUS = 100; // metr
+
+// Qurilma lokatsiyasini olish (Promise)
+function getPosition() {
+  return new Promise((resolve, reject) => {
+    // Xavfsiz kontekst tekshiruvi (HTTPS yoki localhost shart)
+    if (!window.isSecureContext) {
+      reject({ code: 'insecure', message: 'HTTPS kerak' });
+      return;
+    }
+    if (!navigator.geolocation) {
+      reject({ code: 'unsupported', message: 'Geolocation yo\'q' });
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      pos => resolve(pos.coords),
+      err => reject(err),
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+  });
+}
+
+// Geolocation xatosini o'qiladigan xabarga aylantirish
+function geoErrorMessage(e) {
+  if (!e) return 'Noma\'lum xatolik.';
+  if (e.code === 'insecure') return 'Lokatsiya faqat HTTPS saytда ishlaydi. Saytни https:// orqали oching (file:// yoki http:// emas).';
+  if (e.code === 'unsupported') return 'Bu qurilma/brauzer geolocation\'ни qo\'llab-quvvatlamaydi.';
+  // Brauzerнинг standart kodlari
+  switch (e.code) {
+    case 1: return 'Lokatsiyага ruxsat berilmaган. Brauzer sozlamаларидан ruxsat bering.';
+    case 2: return 'Joylashuvни aniqlаб bo\'lmади (GPS/internet signali yo\'q).';
+    case 3: return 'Vaqт tugади. GPS\'ни yoqиб, ochiq joyда qayta urinиб ko\'ring.';
+    default: return e.message || 'Noma\'lum xatolik.';
+  }
+}
+
+// Ikki nuqta orasidagi masofa (metr) — Haversine
+function distanceMeters(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const toRad = d => d * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+// Berilgan koordinataga mos eng yaqin filialni topish (radius ichida)
+function findMatchingBranch(lat, lng) {
+  let best = null;
+  branches.forEach(b => {
+    if (b.lat == null || b.lng == null) return;
+    const r = b.radius || GEOFENCE_DEFAULT_RADIUS;
+    const dist = distanceMeters(lat, lng, Number(b.lat), Number(b.lng));
+    if (dist <= r && (!best || dist < best.dist)) {
+      best = { branch: b, dist: Math.round(dist) };
+    }
+  });
+  return best; // { branch, dist } yoki null
+}
+
+// Radius ichidagi BARCHA filiallar (yaqinlikka qarab tartiblangan)
+function findBranchesInRange(lat, lng) {
+  const list = [];
+  branches.forEach(b => {
+    if (b.lat == null || b.lng == null) return;
+    const r = b.radius || GEOFENCE_DEFAULT_RADIUS;
+    const dist = distanceMeters(lat, lng, Number(b.lat), Number(b.lng));
+    if (dist <= r) list.push({ branch: b, dist: Math.round(dist) });
+  });
+  list.sort((a, b) => a.dist - b.dist);
+  return list;
+}
+
+// Bir nechta filial radiusida bo'lsa — xodim qaysisini tanlaydi (Promise)
+function pickBranch(matches) {
+  return new Promise(resolve => {
+    const box = document.getElementById('branch-pick-list');
+    box.innerHTML = matches.map(m =>
+      `<button class="btn btn-secondary btn-full" style="margin-bottom:10px;justify-content:space-between;" data-bid="${m.branch.id}">
+        <span>🏢 ${m.branch.name}</span>
+        <span style="font-size:12px;color:var(--text2);">~${m.dist}m</span>
+      </button>`
+    ).join('');
+    box.querySelectorAll('button').forEach(btnEl => {
+      btnEl.onclick = () => {
+        const b = matches.find(m => m.branch.id === btnEl.dataset.bid).branch;
+        closeModal('modal-branch-pick');
+        resolve(b);
+      };
+    });
+    // Bekor qilganda null
+    const ov = document.getElementById('modal-branch-pick');
+    ov._onCancel = () => resolve(null);
+    openModal('modal-branch-pick');
+  });
+}
+
+// Kechikish sababini so'rash (Promise) — teg + ixtiyoriy izoh
+let _lateResolve = null, _lateSelected = null;
+function pickLateReason(lateMin) {
+  return new Promise(resolve => {
+    _lateResolve = resolve;
+    _lateSelected = null;
+    document.getElementById('late-reason-sub').textContent = `Siz ${lateMin} daqiqa kech keldingiz. Iltimos, sababini ko'rsating.`;
+    document.getElementById('late-comment').value = '';
+    const pills = document.getElementById('late-reason-pills');
+    const tags = tagsByKind('late');
+    pills.innerHTML = tags.length
+      ? tags.map(tg => `<button type="button" class="pill" data-r="${tg.label.replace(/"/g,'&quot;')}" onclick="selectLatePill(this)">${tg.label}</button>`).join('')
+      : `<span style="font-size:12px;color:var(--text3);">Teglar yo'q — izohда yozing</span>`;
+    openModal('modal-late-reason');
+  });
+}
+function selectLatePill(el) {
+  document.querySelectorAll('#late-reason-pills .pill').forEach(p => p.classList.remove('selected'));
+  el.classList.add('selected');
+  _lateSelected = el.dataset.r;
+}
+function submitLateReason() {
+  const comment = document.getElementById('late-comment').value.trim();
+  if (!_lateSelected && !comment) { showToast('Sabab tanlang yoki izoh yozing'); return; }
+  closeModal('modal-late-reason');
+  const res = { reason: _lateSelected || null, comment: comment || null };
+  const r = _lateResolve; _lateResolve = null;
+  if (r) r(res);
+}
+function cancelLateReason() {
+  closeModal('modal-late-reason');
+  const r = _lateResolve; _lateResolve = null;
+  if (r) r(null);
+}
+
+// Motivatsion / tanbeh xabari (yuqorida kichik message)
+function motivationalMessage(type, lateMin) {
+  let msg, dur = 3500, kind = 'ok';
+  if (type === 'checkin') {
+    if (lateMin > 0) {
+      kind = 'warn';
+      const tanbeh = [
+        `Bugun ${lateMin} daqiqa kech qoldingiz. Iltimos, ishga mas'uliyat bilan yondashing 🙏`,
+        `Kechikish ish sifatiga ta'sir qiladi. Ertaga o'z vaqtida kelishga harakat qiling ⏰`,
+        `Vaqt — eng qimmatli resurs. Keyingi safar o'z vaqtida bo'laylik 💪`
+      ];
+      msg = tanbeh[Math.floor(Math.random()*tanbeh.length)];
+      dur = 5000;
+    } else {
+      const rahmat = [
+        `Xush kelibsiz! O'z vaqtida kelganingiz uchun rahmat 🌟`,
+        `Ajoyib! Bugun ham o'z vaqtidasiz. Samarali ish kuni tilaymiz ☀️`,
+        `Vaqtida keldingiz — barakali ish kuni bo'lsin! 💚`
+      ];
+      msg = rahmat[Math.floor(Math.random()*rahmat.length)];
+    }
+  } else {
+    const yakun = [
+      `Bugungi mehnatingiz uchun rahmat! Yaxshi dam oling 🙌`,
+      `Ish kuni yakunlandi. Zo'r ishladingiz, rahmat! 👏`,
+      `Mehnatingiz uchun tashakkur. Ko'rishguncha! 👋`
+    ];
+    msg = yakun[Math.floor(Math.random()*yakun.length)];
+  }
+  showToast(msg, dur, kind);
+}
+
+// Admin: filial qo'shishda hozirgi joyni olish
+async function grabBranchLocation(btn) {
+  const status = document.getElementById('br-loc-status');
+  const restore = btnLoading(btn);
+  status.textContent = 'Joylashuv aniqlanmoqda...';
+  status.style.color = 'var(--text2)';
+  try {
+    const c = await getPosition();
+    document.getElementById('br-lat').value = c.latitude.toFixed(6);
+    document.getElementById('br-lng').value = c.longitude.toFixed(6);
+    status.textContent = `✓ Olindi (aniqlik: ±${Math.round(c.accuracy)}m)`;
+    status.style.color = 'var(--accent)';
+  } catch (e) {
+    status.textContent = '✕ ' + geoErrorMessage(e);
+    status.style.color = 'var(--red)';
+  } finally {
+    restore();
+  }
+}
+
+
+let myClockTimer = null;
+let myTodayRecords = [];
+
+// O'zbekiston (Tashkent, UTC+5) vaqtini olish
+function uzNow() {
+  // Hozirgi aniq vaqt (UTC) + 5 soat = Tashkent
+  const nowUtcMs = Date.now();
+  return new Date(nowUtcMs + 5 * 3600 * 1000);
+}
+
+function setupMyAttendance() {
+  const initials = currentUser.name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+  document.getElementById('my-avatar').textContent = initials;
+  document.getElementById('my-name').textContent = currentUser.name;
+  document.getElementById('my-position').textContent = (currentUser.position || '') + (currentUser.branch_name ? ' • ' + currentUser.branch_name : '');
+  if (myClockTimer) clearInterval(myClockTimer);
+  tickClock();
+  myClockTimer = setInterval(tickClock, 1000);
+}
+
+function tickClock() {
+  const n = uzNow();
+  const hh = String(n.getUTCHours()).padStart(2,'0');
+  const mm = String(n.getUTCMinutes()).padStart(2,'0');
+  const ss = String(n.getUTCSeconds()).padStart(2,'0');
+  const clk = document.getElementById('my-clock');
+  if (clk) clk.textContent = `${hh}:${mm}:${ss}`;
+  const dt = document.getElementById('my-date');
+  if (dt) dt.textContent = n.toLocaleDateString('uz-UZ', { weekday:'long', day:'numeric', month:'long' });
+}
+
+async function refreshMyAttendance() {
+  // Bugungi (Tashkent) sanasi
+  const n = uzNow();
+  const dayStr = `${n.getUTCFullYear()}-${String(n.getUTCMonth()+1).padStart(2,'0')}-${String(n.getUTCDate()).padStart(2,'0')}`;
+  // Bugun 00:00 Tashkent = (kun - 5 soat) UTC
+  const fromUtc = new Date(Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate(), 0, 0, 0) - 5*3600*1000);
+  const toUtc = new Date(fromUtc.getTime() + 24*3600*1000);
+  const { data } = await sb.from('attendance').select('*')
+    .eq('staff_id', currentUser.id)
+    .gte('time', fromUtc.toISOString())
+    .lt('time', toUtc.toISOString())
+    .order('time', { ascending: true });
+  myTodayRecords = data || [];
+  renderMyToday();
+}
+
+function renderMyToday() {
+  const box = document.getElementById('my-status-box');
+  const rows = document.getElementById('my-today-rows');
+  const session = openSession(); // ochiq sessiya bo'lsa — keldim qilingan, ketdim kutilmoqda
+
+  // Tugmalar holati: sessiya ochiq bo'lsa faqat Ketdim, aks holda faqat Keldim
+  const inBtn = document.getElementById('btn-checkin');
+  const outBtn = document.getElementById('btn-checkout');
+  inBtn.disabled = !!session;
+  inBtn.style.opacity = session ? '0.45' : '1';
+  outBtn.disabled = !session;
+  outBtn.style.opacity = session ? '1' : '0.45';
+  outBtn.title = !session ? 'Avval Keldim qiling' : `Ketdim: ${session.branch_name||''}`;
+
+  // Holat matni
+  if (session) {
+    outBtn.innerHTML = `⬇ Ketdim — ${session.branch_name||''}`;
+  } else {
+    outBtn.innerHTML = '⬇ Ketdim';
+  }
+
+  // Holat ko'rsatkichi
+  const banner = document.getElementById('my-state-banner');
+  if (banner) {
+    if (session) {
+      banner.style.display = '';
+      banner.style.background = 'rgba(79,184,154,0.16)';
+      banner.style.color = 'var(--green)';
+      banner.textContent = `🟢 Ish vaqtidasiz — ${session.branch_name||''}`;
+    } else if (myTodayRecords.length) {
+      banner.style.display = '';
+      banner.style.background = 'var(--inset-bg)';
+      banner.style.color = 'var(--text2)';
+      banner.textContent = '⚪ Hozir ish vaqtida emassiz';
+    } else {
+      banner.style.display = 'none';
+    }
+  }
+
+  if (!myTodayRecords.length) { box.style.display = 'none'; return; }
+  box.style.display = '';
+  rows.innerHTML = myTodayRecords.map(r => {
+    const local = new Date(new Date(r.time).getTime() + 5*3600*1000);
+    const hm = String(local.getUTCHours()).padStart(2,'0') + ':' + String(local.getUTCMinutes()).padStart(2,'0');
+    const isIn = r.type === 'checkin';
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;">
+      <span style="font-weight:600;">${isIn ? '⬆ Keldim' : '⬇ Ketdim'}${r.branch_name?` <span style="color:var(--text2);font-weight:400;font-size:12px;">• ${r.branch_name}</span>`:''}</span>
+      <span style="display:flex;gap:6px;align-items:center;">
+        <span class="time-badge">${hm}</span>
+        ${r.late_minutes>0?`<span class="late-badge">+${r.late_minutes} min</span>`:(isIn?`<span class="on-time-badge">Vaqtida</span>`:'')}
+      </span>
+    </div>`;
+  }).join('');
+}
+
+// Ochiq sessiyani aniqlash: oxirgi yozuv 'checkin' bo'lsa — sessiya ochiq
+function openSession() {
+  if (!myTodayRecords.length) return null;
+  const last = myTodayRecords[myTodayRecords.length - 1];
+  return last.type === 'checkin' ? last : null;
+}
+
+async function myCheck(type) {
+  const session = openSession();
+
+  // Tartib tekshiruvi
+  if (type === 'checkin' && session) {
+    showToast('Avval "Ketdim" qiling, keyin yana "Keldim".', 3000);
+    return;
+  }
+  if (type === 'checkout' && !session) {
+    showToast('Avval "Keldim" qiling!');
+    return;
+  }
+
+  const btn = document.getElementById(type==='checkin'?'btn-checkin':'btn-checkout');
+  const restore = btnLoading(btn);
+
+  try {
+    // 1. GPS olish (keldim va ketdim uchun ham)
+    showLoader('Joylashuv tekshirilmoqda...');
+    let coords;
+    try {
+      coords = await getPosition();
+    } catch (e) {
+      hideLoader();
+      showToast(geoErrorMessage(e), 4000);
+      return;
+    }
+
+    // 2. Filialni aniqlash
+    let chosenBranch;
+    if (type === 'checkout') {
+      // Ketdim — majburan o'sha keldim qilingan filialda
+      const lockedId = session.branch_id;
+      const lockedName = session.branch_name;
+      const here = findMatchingBranch(coords.latitude, coords.longitude);
+      hideLoader();
+      if (!here || here.branch.id !== lockedId) {
+        showToast(`Ketdim faqat "${lockedName}" filialida belgilanadi. Siz hozir u yerda emassiz.`, 4500);
+        return;
+      }
+      chosenBranch = here.branch;
+    } else {
+      // Keldim — radiusdagi mos filial(lar)ni topish
+      const matches = findBranchesInRange(coords.latitude, coords.longitude);
+      hideLoader();
+      if (!matches.length) {
+        showToast('Siz hech qaysi filial hududida emassiz. Davomat qabul qilinmadi.', 4000);
+        return;
+      }
+      // Har safar filial so'raladi (bitta bo'lsa ham tasdiqlash uchun)
+      chosenBranch = await pickBranch(matches);
+      if (!chosenBranch) return; // bekor qildi — finally restore qiladi
+    }
+
+    // 3. Vaqt va kechikish (ish kunlari va smena vaqtlari bo'yicha)
+    const nowUtc = new Date();
+    const local = uzNow();
+    const hm = local.getUTCHours()*60 + local.getUTCMinutes();
+    const dow = local.getUTCDay(); // 0=Yakshanba ... 6=Shanba
+    let lateMin = 0;
+    if (type === 'checkin' && currentUser.shifts) {
+      const shifts = typeof currentUser.shifts === 'string' ? JSON.parse(currentUser.shifts) : currentUser.shifts;
+      // Bugungi kunga to'g'ri keladigan smenalar
+      const todayShifts = (shifts||[]).filter(sh => {
+        if (!sh.start) return false;
+        if (!sh.days || !sh.days.length) return true; // kun belgilanmagan bo'lsa har kun
+        return sh.days.includes(dow);
+      });
+      todayShifts.forEach(sh => {
+        const [h,m] = sh.start.split(':').map(Number);
+        const expected = h*60+m;
+        if (hm > expected + 5) lateMin = lateMin===0 ? hm-expected : Math.min(lateMin, hm-expected);
+      });
+    }
+
+    // 3b. Kech kelgan bo'lsa — sabab majburiy
+    let lateReason = null, lateComment = null;
+    if (type === 'checkin' && lateMin > 0) {
+      const res = await pickLateReason(lateMin);
+      if (!res) return; // bekor qildi — finally restore qiladi
+      lateReason = res.reason;
+      lateComment = res.comment;
+    }
+
+    // 4. Saqlash
+    await withLoader(t('save')+'...', async () => {
+      const { error } = await sb.from('attendance').insert([{
+        staff_id: currentUser.id,
+        staff_name: currentUser.name,
+        branch_id: chosenBranch.id,
+        branch_name: chosenBranch.name,
+        type,
+        time: nowUtc.toISOString(),
+        late_minutes: lateMin,
+        late_reason: lateReason,
+        late_comment: lateComment,
+        lat: coords.latitude,
+        lng: coords.longitude
+      }]);
+      if (error) throw error;
+    });
+
+    // 5. Motivatsion xabar
+    motivationalMessage(type, lateMin);
+    await refreshMyAttendance();
+  } catch (e) {
+    hideLoader();
+    showToast(t('error'));
+  } finally {
+    restore();
+    renderMyToday();
+  }
+}
+
+// ============================================================
+// ATTENDANCE (Admin)
+// ============================================================
+function switchAttTab(tab) {
+  ['checkin','report','late'].forEach(t => {
+    document.getElementById('att-'+t).classList.toggle('hidden', t!==tab);
+    document.getElementById('att-tab-'+t).classList.toggle('active', t===tab);
+  });
+  if (tab==='report') { populateReportBranch(); loadReport(); }
+  if (tab==='late') loadLate();
+}
+
+function openCheckIn() {
+  const now = new Date(); now.setSeconds(0); now.setMilliseconds(0);
+  document.getElementById('ci-time').value = now.toISOString().slice(0,16);
+  selectedCIType = 'checkin';
+  document.querySelectorAll('#modal-checkin .pill-entity').forEach((p,i) => p.classList.toggle('selected', i===0));
+  openModal('modal-checkin');
+}
+function selectCIType(t) { selectedCIType=t; document.querySelectorAll('#modal-checkin .pill-entity').forEach(p=>{p.classList.toggle('selected',p.textContent.trim()===(t==='checkin'?'Keldi':'Ketdi'));}); }
+
+async function saveCheckIn() {
+  const staffId = document.getElementById('ci-staff').value;
+  const branchId = document.getElementById('ci-branch').value;
+  const time = document.getElementById('ci-time').value;
+  if (!staffId || !time) { showToast('Ma\'lumot to\'ldiring!'); return; }
+  const staff = staffList.find(s=>s.id===staffId);
+  const branch = branches.find(b=>b.id===branchId);
+  // Calculate lateness
+  let lateMin = 0;
+  if (selectedCIType === 'checkin' && staff?.shifts) {
+    const shifts = typeof staff.shifts === 'string' ? JSON.parse(staff.shifts) : staff.shifts;
+    const t = new Date(time);
+    const hm = t.getHours()*60 + t.getMinutes();
+    shifts.forEach(sh => {
+      const [h,m] = sh.start.split(':').map(Number);
+      const expected = h*60+m;
+      if (hm > expected + 5) lateMin = Math.max(lateMin, hm - expected);
+    });
+  }
+  await withLoader(t('save')+'...', async () => {
+    await sb.from('attendance').insert([{
+      staff_id: staffId, staff_name: staff?.name, branch_id: branchId, branch_name: branch?.name,
+      type: selectedCIType, time: new Date(time).toISOString(), late_minutes: lateMin
+    }]);
+    await loadAttendance();
+  });
+  showToast(t('saved'));
+  closeModal('modal-checkin');
+}
+
+function renderTodayAttendance() {
+  const el = document.getElementById('today-attendance');
+  if (!attendances.length) { el.innerHTML = `<div class="empty"><div class="empty-icon">📋</div><h3>${t('no_data')}</h3></div>`; return; }
+  el.innerHTML = attendances.map(a => {
+    const time = new Date(a.time);
+    const hm = time.getHours().toString().padStart(2,'0') + ':' + time.getMinutes().toString().padStart(2,'0');
+    return `<div class="shift-card">
+      <div class="shift-row">
+        <div>
+          <div style="font-weight:700;font-size:14px;">${a.staff_name||'-'}</div>
+          <div style="font-size:12px;color:var(--text2);">${a.branch_name||''}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+          <span class="time-badge">${a.type==='checkin'?'⬆':'⬇'} ${hm}</span>
+          ${a.late_minutes>0?`<span class="late-badge">+${a.late_minutes} min kech</span>`:`<span class="on-time-badge">Vaqtida</span>`}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderLate(data) {
+  const late = data.filter(a => a.late_minutes > 0);
+  const el = document.getElementById('late-list');
+  if (!late.length) { el.innerHTML = `<div class="empty"><div class="empty-icon">✅</div><h3>Kechikkanlar yo'q</h3></div>`; return; }
+  el.innerHTML = late.map(a => {
+    const d = new Date(a.time);
+    return `<div class="shift-card">
+      <div class="shift-row">
+        <div>
+          <div style="font-weight:700;font-size:14px;">${a.staff_name}</div>
+          <div style="font-size:12px;color:var(--text2);">${a.branch_name||''} • ${d.toLocaleDateString('uz')} ${d.toLocaleTimeString('uz',{hour:'2-digit',minute:'2-digit'})}</div>
+        </div>
+        <span class="late-badge">+${a.late_minutes} min</span>
+      </div>
+      ${(a.late_reason || a.late_comment) ? `<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--glass-border);">
+        ${a.late_reason?`<span class="tag tag-yellow">${a.late_reason}</span>`:''}
+        ${a.late_comment?`<div style="font-size:12px;color:var(--text2);margin-top:4px;">💬 ${a.late_comment}</div>`:''}
+      </div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function setReportPeriod(p) {
+  reportPeriod = p;
+  ['daily','weekly','monthly'].forEach(x => document.getElementById('rp-'+x).classList.toggle('active', x===p));
+  loadReport();
+}
+
+function populateReportBranch() {
+  const sel = document.getElementById('report-branch');
+  sel.innerHTML = '<option value="">Barcha filiallar</option>' + branches.map(b=>`<option value="${b.id}">${b.name}</option>`).join('');
+}
+
+async function loadReport() {
+  const branchId = document.getElementById('report-branch')?.value;
+  const now = new Date();
+  let from;
+  if (reportPeriod === 'daily') { from = new Date(now.getFullYear(), now.getMonth(), now.getDate()); }
+  else if (reportPeriod === 'weekly') { const d = now.getDay(); from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - d); }
+  else { from = new Date(now.getFullYear(), now.getMonth(), 1); }
+  let query = sb.from('attendance').select('*').gte('time', from.toISOString()).order('time', { ascending: false });
+  if (branchId) query = query.eq('branch_id', branchId);
+  const { data } = await query;
+  renderReportTable(data || []);
+  renderDonutChart(data || []);
+}
+
+// Animatik doirali (donut) diagramma — xodimlar bo'yicha kelishlar soni
+function renderDonutChart(data) {
+  const card = document.getElementById('report-chart-card');
+  const svg = document.getElementById('donut-chart');
+  const legend = document.getElementById('donut-legend');
+  if (!card || !svg) return;
+
+  // Faqat checkin (kelish) larni xodim bo'yicha sanaймиз
+  const counts = {};
+  data.filter(r => r.type === 'checkin').forEach(r => {
+    const name = r.staff_name || '-';
+    counts[name] = (counts[name] || 0) + 1;
+  });
+  const entries = Object.entries(counts).sort((a,b) => b[1]-a[1]);
+  if (!entries.length) { card.style.display = 'none'; return; }
+  card.style.display = '';
+
+  const total = entries.reduce((s,[,v]) => s+v, 0);
+  const palette = ['#6c7ce0','#5fc4a6','#e0a23c','#e06b7c','#8a7cd8','#4fb89a','#5b9bd5','#d05568'];
+  const cx = 90, cy = 90, r = 64, sw = 26;
+  const circ = 2 * Math.PI * r;
+
+  let offset = 0;
+  let segs = '';
+  entries.forEach(([name, val], i) => {
+    const len = (val / total) * circ;
+    const color = palette[i % palette.length];
+    segs += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${color}" stroke-width="${sw}"
+      stroke-dasharray="${len} ${circ - len}" stroke-dashoffset="${-offset}"
+      transform="rotate(-90 ${cx} ${cy})" opacity="0">
+      <animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="${i*0.15}s" fill="freeze"/>
+      <animate attributeName="stroke-dasharray" from="0 ${circ}" to="${len} ${circ - len}" dur="0.7s" begin="${i*0.15}s" fill="freeze" calcMode="spline" keySplines="0.4 0 0.2 1"/>
+    </circle>`;
+    offset += len;
+  });
+
+  svg.innerHTML = `
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--inset-bg)" stroke-width="${sw}"/>
+    ${segs}
+    <text x="${cx}" y="${cy-4}" text-anchor="middle" font-size="26" font-weight="800" fill="var(--text)" font-family="Sora,sans-serif">${total}</text>
+    <text x="${cx}" y="${cy+16}" text-anchor="middle" font-size="11" fill="var(--text2)" font-family="Manrope,sans-serif">kelish</text>
+  `;
+
+  legend.innerHTML = entries.map(([name, val], i) => {
+    const color = palette[i % palette.length];
+    const pct = Math.round(val/total*100);
+    return `<div style="display:flex;align-items:center;gap:8px;font-size:12px;">
+      <span style="width:12px;height:12px;border-radius:4px;background:${color};flex-shrink:0;"></span>
+      <span style="flex:1;">${name}</span>
+      <span style="font-weight:700;color:var(--text2);">${val} (${pct}%)</span>
+    </div>`;
+  }).join('');
+}
+
+function renderReportTable(data) {
+  const el = document.getElementById('report-table');
+  if (!data.length) { el.innerHTML = `<div class="empty"><h3>${t('no_data')}</h3></div>`; return; }
+  el.innerHTML = `<div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead><tr style="color:var(--text2);">
+        <th style="text-align:left;padding:8px 4px;border-bottom:1px solid var(--card-border);">Xodim</th>
+        <th style="text-align:left;padding:8px 4px;border-bottom:1px solid var(--card-border);">Filial</th>
+        <th style="text-align:left;padding:8px 4px;border-bottom:1px solid var(--card-border);">Tur</th>
+        <th style="text-align:left;padding:8px 4px;border-bottom:1px solid var(--card-border);">Vaqt</th>
+        <th style="text-align:right;padding:8px 4px;border-bottom:1px solid var(--card-border);">Kechikish</th>
+        <th style="text-align:left;padding:8px 4px;border-bottom:1px solid var(--card-border);">Sabab / Izoh</th>
+      </tr></thead>
+      <tbody>${data.map(r=>{
+        const d = new Date(r.time);
+        const reasonCell = (r.late_reason || r.late_comment)
+          ? `${r.late_reason?`<span class="tag tag-yellow">${r.late_reason}</span>`:''}${r.late_comment?`<div style="font-size:11px;color:var(--text2);margin-top:2px;">${r.late_comment}</div>`:''}`
+          : '';
+        return `<tr>
+          <td style="padding:8px 4px;border-bottom:1px solid var(--card-border);">${r.staff_name||'-'}</td>
+          <td style="padding:8px 4px;border-bottom:1px solid var(--card-border);color:var(--text2);">${r.branch_name||'-'}</td>
+          <td style="padding:8px 4px;border-bottom:1px solid var(--card-border);">${r.type==='checkin'?'⬆ Keldi':'⬇ Ketdi'}</td>
+          <td style="padding:8px 4px;border-bottom:1px solid var(--card-border);">${d.toLocaleDateString('uz')} ${d.toLocaleTimeString('uz',{hour:'2-digit',minute:'2-digit'})}</td>
+          <td style="padding:8px 4px;border-bottom:1px solid var(--card-border);text-align:right;">${r.late_minutes>0?`<span class="late-badge">+${r.late_minutes}min</span>`:''}</td>
+          <td style="padding:8px 4px;border-bottom:1px solid var(--card-border);">${reasonCell}</td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>
+  </div>`;
+  // Excel uchun xom ma'lumotni saqlaymiz
+  _lastReportData = data;
+}
+
+let _lastReportData = [];
+
+function exportExcel() {
+  const rows = [['Xodim','Filial','Tur','Sana','Vaqt','Kechikish (min)','Sabab','Izoh']];
+  _lastReportData.forEach(r => {
+    const d = new Date(r.time);
+    rows.push([
+      r.staff_name||'', r.branch_name||'',
+      r.type==='checkin'?'Keldi':'Ketdi',
+      d.toLocaleDateString('uz'), d.toLocaleTimeString('uz',{hour:'2-digit',minute:'2-digit'}),
+      r.late_minutes>0?r.late_minutes:0,
+      r.late_reason||'', r.late_comment||''
+    ]);
+  });
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Hisobot');
+  XLSX.writeFile(wb, `Hisobot_${new Date().toLocaleDateString('uz')}.xlsx`);
+}
+
+// ============================================================
+// TASKS
+// ============================================================
+function renderTasks() {
+  const el = document.getElementById('tasks-list');
+  if (!tasks.length) { el.innerHTML = `<div class="empty"><div class="empty-icon">📋</div><h3>${t('no_data')}</h3></div>`; return; }
+  el.innerHTML = tasks.map(task => {
+    const d = task.deadline ? new Date(task.deadline) : null;
+    const isUrgent = d && d < new Date();
+    const typeLabel = { task:t('task'), note:t('note'), alert:t('alert') }[task.type] || task.type;
+    const typeCls = { task:'tag-blue', note:'tag-blue', alert:'tag-red' }[task.type] || 'tag-blue';
+    const created = task.created_at ? new Date(task.created_at).toLocaleDateString('uz-UZ',{day:'numeric',month:'short',year:'numeric'}) : '';
+    const seen = seenTaskIds();
+    const isNew = !seen.includes(task.id);
+    return `<div class="task-card ${isUrgent?'urgent':'normal'}" onclick="openTaskDetail('${task.id}')">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+        ${isNew?`<span style="width:8px;height:8px;border-radius:50%;background:var(--red);flex-shrink:0;"></span>`:''}
+        <div style="font-size:14px;font-weight:700;">${task.title}</div>
+      </div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:8px;">${(task.body||'').slice(0,80)}${task.body&&task.body.length>80?'...':''}</div>
+      <div class="task-meta">
+        <span class="tag ${typeCls}">${typeLabel}</span>
+        ${task.assigned_name?`<span class="tag tag-blue">👤 ${task.assigned_name}</span>`:''}
+        ${d?`<span class="tag ${isUrgent?'tag-red':'tag-yellow'}">⏰ ${d.toLocaleDateString('uz')}</span>`:''}
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-top:8px;">📅 Berilgan: ${created}</div>
+    </div>`;
+  }).join('');
+}
+
+function openAddTask() {
+  document.getElementById('t-title').value=''; document.getElementById('t-body').value='';
+  document.getElementById('t-deadline').value='';
+  selectedTaskType = 'task';
+  document.querySelectorAll('#modal-task .pill-entity').forEach((p,i)=>p.classList.toggle('selected',i===0));
+  populateTaskStaff();
+  openModal('modal-task');
+}
+
+function selectTaskType(type) {
+  selectedTaskType = type;
+  const labels = { task: t('task'), note: t('note'), alert: t('alert') };
+  document.querySelectorAll('#modal-task .pill-entity').forEach(p => p.classList.toggle('selected', p.textContent.trim() === labels[type]));
+}
+
+function populateTaskStaff() {
+  const sel = document.getElementById('t-staff');
+  sel.innerHTML = '<option value="">Barcha xodimlar</option>' + staffList.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+}
+
+async function saveTask() {
+  const title = document.getElementById('t-title').value.trim();
+  if (!title) { showToast('Sarlavha kerak!'); return; }
+  const staffId = document.getElementById('t-staff').value;
+  const staff = staffList.find(s=>s.id===staffId);
+  await withLoader(t('save')+'...', async () => {
+    await sb.from('tasks').insert([{
+      title, body: document.getElementById('t-body').value,
+      assigned_to: staffId||null, assigned_name: staff?.name||null,
+      type: selectedTaskType, deadline: document.getElementById('t-deadline').value||null,
+      created_by: currentUser.id, replies: []
+    }]);
+    await loadTasks();
+  });
+  showToast(t('saved'));
+  closeModal('modal-task');
+}
+
+function openTaskDetail(id) {
+  const task = tasks.find(x=>x.id===id);
+  if (!task) return;
+  currentTaskId = id;
+  const replies = task.replies || [];
+  const d = task.deadline ? new Date(task.deadline) : null;
+  document.getElementById('task-detail-content').innerHTML = `
+    <div style="margin-bottom:16px;">
+      <div style="font-size:18px;font-weight:700;margin-bottom:8px;">${task.title}</div>
+      <div style="font-size:14px;color:var(--text2);margin-bottom:12px;">${task.body||''}</div>
+      ${d?`<div class="tag tag-yellow" style="display:inline-block;margin-bottom:8px;">⏰ Muddat: ${d.toLocaleString('uz')}</div>`:''}
+      ${replies.length?`<div style="margin-top:12px;"><div style="font-size:12px;color:var(--text2);margin-bottom:8px;">Javoblar:</div>${replies.map(r=>`<div class="reply-box"><div class="reply-from">${r.from}</div><div class="reply-item">${r.text}</div></div>`).join('')}</div>`:''}
+    </div>`;
+  const isAdmin = currentUser.role === 'admin' || currentUser.role === 'superadmin';
+  document.getElementById('reply-section').style.display = '';
+  document.getElementById('reply-input').value = '';
+  openModal('modal-task-detail');
+}
+
+async function sendReply() {
+  const text = document.getElementById('reply-input').value.trim();
+  if (!text) return;
+  const task = tasks.find(x=>x.id===currentTaskId);
+  if (!task) return;
+  const replies = task.replies || [];
+  replies.push({ from: currentUser.name, text, time: new Date().toISOString() });
+  await withLoader(t('save')+'...', async () => {
+    await sb.from('tasks').update({ replies }).eq('id', currentTaskId);
+    await loadTasks();
+  });
+  showToast(t('saved'));
+  closeModal('modal-task-detail');
+}
+
+// ============================================================
+// STAFF (ADMIN)
+// ============================================================
+function switchAdminTab(tab) {
+  ['staff','branches','admins','tags'].forEach(t => {
+    document.getElementById('adm-'+t).classList.toggle('hidden', t!==tab);
+    document.getElementById('adm-tab-'+t).classList.toggle('active', t===tab);
+  });
+  if (tab === 'tags') renderTags();
+}
+
+// ============================================================
+// TAGS (Sabab teglari — Super Admin)
+// ============================================================
+const TAG_KINDS = [
+  { kind:'late', label:'⏰ Kechikish sabablari' },
+  { kind:'frozen', label:'❄️ Muzlatish sabablari' },
+  { kind:'left', label:'🚪 Ketish sabablari' },
+  { kind:'returned', label:'↩️ Qaytish sabablari' },
+  { kind:'trial', label:'🎯 Sinov sabablari' },
+  { kind:'contract', label:'📝 Shartnoma sabablari' }
+];
+
+function renderTags() {
+  const box = document.getElementById('tags-groups');
+  box.innerHTML = TAG_KINDS.map(k => {
+    const list = tagsByKind(k.kind);
+    const chips = list.length
+      ? list.map(tg => `<span class="branch-chip" style="cursor:default;">${tg.label}
+          <button onclick="deleteTag('${tg.id}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-weight:700;margin-left:2px;">✕</button>
+        </span>`).join('')
+      : `<span style="font-size:12px;color:var(--text3);">Hali teg yo'q</span>`;
+    return `<div class="card">
+      <div style="font-weight:700;font-size:14px;margin-bottom:10px;">${k.label}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;">${chips}</div>
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="tag-input-${k.kind}" placeholder="Yangi teg..." style="flex:1;padding:9px 12px;border-radius:10px;border:none;background:var(--inset-bg);color:var(--text);box-shadow:var(--shadow-in);font-family:'Manrope',sans-serif;font-size:13px;">
+        <button class="btn btn-sm btn-primary" onclick="addTag('${k.kind}')">+ Qo'shish</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function addTag(kind) {
+  const inp = document.getElementById('tag-input-' + kind);
+  const label = inp.value.trim();
+  if (!label) return;
+  const maxSort = Math.max(0, ...tagsByKind(kind).map(t => t.sort || 0));
+  await withLoader(t('save')+'...', async () => {
+    await sb.from('app_tags').insert([{ kind, label, sort: maxSort + 1 }]);
+    await loadTags();
+  });
+  showToast(t('saved'), 1500, 'ok');
+  renderTags();
+}
+
+async function deleteTag(id) {
+  if (!confirm('Teg o\'chirilsinmi?')) return;
+  await withLoader(t('del')+'...', async () => {
+    await sb.from('app_tags').delete().eq('id', id);
+    await loadTags();
+  });
+  showToast(t('deleted'), 1500);
+  renderTags();
+}
+
+function renderStaff() {
+  const el = document.getElementById('staff-list');
+  if (!staffList.length) { el.innerHTML = `<div class="empty"><div class="empty-icon">👤</div><h3>${t('no_data')}</h3></div>`; return; }
+  el.innerHTML = staffList.map(s => `<div class="card" style="display:flex;align-items:center;gap:12px;">
+    <div class="avatar" style="width:40px;height:40px;font-size:14px;flex-shrink:0;">${s.name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2)}</div>
+    <div style="flex:1;min-width:0;">
+      <div style="font-weight:700;font-size:14px;">${s.name}</div>
+      <div style="font-size:12px;color:var(--text2);">${s.position||''} ${s.branch_name?'• '+s.branch_name:''}</div>
+      <div style="font-size:11px;color:var(--text3);">Login: ${s.login}</div>
+    </div>
+    <div style="display:flex;gap:6px;">
+      <button class="btn btn-sm btn-secondary" onclick="editStaff('${s.id}')">✏️</button>
+      <button class="btn btn-sm btn-danger" onclick="deleteStaff('${s.id}')">🗑</button>
+    </div>
+  </div>`).join('');
+}
+
+function openAddStaff() {
+  currentEditStaffId = null;
+  document.getElementById('st-name').value=''; document.getElementById('st-login').value='';
+  document.getElementById('st-password').value=''; document.getElementById('st-position').value='';
+  document.getElementById('modal-staff-title').textContent = 'Xodim qo\'shish';
+  document.getElementById('shifts-container').innerHTML=''; addShiftRow();
+  populateBranchSelect('st-branch');
+  openModal('modal-staff');
+}
+
+function editStaff(id) {
+  const s = staffList.find(x=>x.id===id);
+  if (!s) return;
+  currentEditStaffId = id;
+  document.getElementById('st-name').value = s.name;
+  document.getElementById('st-login').value = s.login;
+  document.getElementById('st-password').value = '';
+  document.getElementById('st-position').value = s.position||'';
+  document.getElementById('modal-staff-title').textContent = 'Tahrirlash';
+  populateBranchSelect('st-branch');
+  document.getElementById('st-branch').value = s.branch_id||'';
+  document.getElementById('shifts-container').innerHTML='';
+  const shifts = s.shifts ? (typeof s.shifts==='string'?JSON.parse(s.shifts):s.shifts) : [];
+  if (shifts.length) shifts.forEach(sh => addShiftRow(sh.start, sh.end, sh.days||[]));
+  else addShiftRow();
+  openModal('modal-staff');
+}
+
+function addShiftRow(start='', end='', days=[]) {
+  const c = document.getElementById('shifts-container');
+  const div = document.createElement('div');
+  div.className = 'shift-card';
+  div.style.cssText = 'padding:12px;margin-bottom:10px;';
+  const dayDefs = [[1,'Du'],[2,'Se'],[3,'Ch'],[4,'Pa'],[5,'Ju'],[6,'Sha'],[0,'Ya']];
+  const dayBtns = dayDefs.map(([d,lbl]) =>
+    `<button type="button" class="day-pill${days.includes(d)?' on':''}" data-day="${d}" onclick="this.classList.toggle('on')">${lbl}</button>`
+  ).join('');
+  div.innerHTML = `
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
+      <input type="time" value="${start}" class="sh-start" style="flex:1;padding:9px;border-radius:10px;border:none;background:var(--inset-bg);color:var(--text);box-shadow:var(--shadow-in);font-family:Manrope,sans-serif;">
+      <span style="color:var(--text2);">—</span>
+      <input type="time" value="${end}" class="sh-end" style="flex:1;padding:9px;border-radius:10px;border:none;background:var(--inset-bg);color:var(--text);box-shadow:var(--shadow-in);font-family:Manrope,sans-serif;">
+      <button class="btn btn-sm btn-danger btn-icon" onclick="this.closest('.shift-card').remove()">✕</button>
+    </div>
+    <div style="display:flex;gap:5px;flex-wrap:wrap;" class="sh-days">${dayBtns}</div>`;
+  c.appendChild(div);
+}
+
+async function saveStaff() {
+  const name = document.getElementById('st-name').value.trim();
+  const login = document.getElementById('st-login').value.trim();
+  const pass = document.getElementById('st-password').value.trim();
+  if (!name || !login) { showToast('Ism va login kerak!'); return; }
+  const shifts = [];
+  document.querySelectorAll('#shifts-container .shift-card').forEach(row => {
+    const start = row.querySelector('.sh-start')?.value;
+    const end = row.querySelector('.sh-end')?.value;
+    if (start && end) {
+      const days = [...row.querySelectorAll('.sh-days .day-pill.on')].map(b => Number(b.dataset.day));
+      shifts.push({ start, end, days });
+    }
+  });
+  const branchId = document.getElementById('st-branch').value;
+  const branch = branches.find(b=>b.id===branchId);
+  const obj = { name, login, position: document.getElementById('st-position').value, branch_id: branchId||null, branch_name: branch?.name||null, shifts: JSON.stringify(shifts) };
+  if (pass) obj.password = pass;
+  if (!currentEditStaffId && !pass) { showToast('Parol kerak!'); return; }
+  await withLoader(t('save')+'...', async () => {
+    if (currentEditStaffId) { await sb.from('staff').update(obj).eq('id', currentEditStaffId); }
+    else { await sb.from('staff').insert([{ ...obj, role:'staff', password:pass }]); }
+    await loadStaff();
+  });
+  showToast(t('saved')); closeModal('modal-staff'); renderStaff();
+}
+
+async function deleteStaff(id) {
+  if (!confirm('O\'chirilsinmi?')) return;
+  await withLoader(t('del')+'...', async () => {
+    await sb.from('staff').delete().eq('id', id);
+    await loadStaff();
+  });
+  showToast(t('deleted')); renderStaff();
+}
+
+// ============================================================
+// BRANCHES
+// ============================================================
+function renderBranches() {
+  const el = document.getElementById('branches-list');
+  if (!branches.length) { el.innerHTML = `<div class="empty"><div class="empty-icon">🏢</div><h3>${t('no_data')}</h3></div>`; return; }
+  el.innerHTML = branches.map(b => `<div class="card" style="display:flex;align-items:center;gap:12px;">
+    <div style="width:36px;height:36px;border-radius:10px;background:rgba(124,155,255,0.15);display:flex;align-items:center;justify-content:center;font-size:18px;">🏢</div>
+    <div style="flex:1;">
+      <div style="font-weight:700;font-size:14px;">${b.name}</div>
+      <div style="font-size:12px;color:var(--text2);">${b.address||''}</div>
+      <div style="font-size:11px;margin-top:2px;color:${(b.lat!=null&&b.lng!=null)?'var(--accent)':'var(--red)'};">${(b.lat!=null&&b.lng!=null)?`📍 GPS o'rnatilgan • ${b.radius||100}m`:'⚠ GPS belgilanmagan'}</div>
+    </div>
+    <button class="btn btn-sm btn-danger" onclick="deleteBranch('${b.id}')">🗑</button>
+  </div>`).join('');
+}
+
+function openAddBranch() {
+  document.getElementById('br-name').value='';
+  document.getElementById('br-address').value='';
+  document.getElementById('br-lat').value='';
+  document.getElementById('br-lng').value='';
+  document.getElementById('br-radius').value='100';
+  const st = document.getElementById('br-loc-status');
+  st.textContent=''; st.style.color='var(--text2)';
+  openModal('modal-branch');
+}
+async function saveBranch() {
+  const name = document.getElementById('br-name').value.trim();
+  if (!name) return;
+  const lat = parseFloat(document.getElementById('br-lat').value);
+  const lng = parseFloat(document.getElementById('br-lng').value);
+  if (isNaN(lat) || isNaN(lng)) { showToast('Filial joylashuvini (GPS) belgilang!'); return; }
+  const radius = parseInt(document.getElementById('br-radius').value) || GEOFENCE_DEFAULT_RADIUS;
+  await withLoader(t('save')+'...', async () => {
+    await sb.from('branches').insert([{ name, address: document.getElementById('br-address').value, lat, lng, radius }]);
+    await loadBranches();
+  });
+  showToast(t('saved')); closeModal('modal-branch'); renderBranches();
+}
+async function deleteBranch(id) {
+  if (!confirm('O\'chirilsinmi?')) return;
+  await withLoader(t('del')+'...', async () => {
+    await sb.from('branches').delete().eq('id', id);
+    await loadBranches();
+  });
+  showToast(t('deleted')); renderBranches();
+}
+
+// ============================================================
+// ADMINS (Super Admin only)
+// ============================================================
+function renderAdmins() {
+  if (currentUser.role !== 'superadmin') return;
+  const el = document.getElementById('admins-list');
+  if (!admins.length) { el.innerHTML = `<div class="empty"><div class="empty-icon">👤</div><h3>${t('no_data')}</h3></div>`; return; }
+  el.innerHTML = admins.map(a => `<div class="card" style="display:flex;align-items:center;gap:12px;">
+    <div class="avatar" style="width:38px;height:38px;font-size:14px;flex-shrink:0;background:linear-gradient(135deg,#e0a23c,#d05568);">${a.name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2)}</div>
+    <div style="flex:1;">
+      <div style="font-weight:700;font-size:14px;">${a.name} <span class="role-badge role-admin">Admin</span></div>
+      <div style="font-size:12px;color:var(--text2);">Login: ${a.login}</div>
+    </div>
+    <button class="btn btn-sm btn-danger btn-icon" onclick="deleteAdmin('${a.id}')">🗑</button>
+  </div>`).join('');
+}
+
+function openAddAdmin() { document.getElementById('adm-name').value=''; document.getElementById('adm-login').value=''; document.getElementById('adm-password').value=''; openModal('modal-admin'); }
+async function saveAdmin() {
+  const name = document.getElementById('adm-name').value.trim();
+  const login = document.getElementById('adm-login').value.trim();
+  const pass = document.getElementById('adm-password').value.trim();
+  if (!name||!login||!pass) { showToast('Barcha maydonlarni to\'ldiring!'); return; }
+  const perms = { add_staff: document.getElementById('perm-add-staff').checked, tasks: document.getElementById('perm-tasks').checked, reports: document.getElementById('perm-reports').checked, students: document.getElementById('perm-students').checked };
+  await withLoader(t('save')+'...', async () => {
+    await sb.from('admins').insert([{ name, login, password:pass, permissions: perms }]);
+    await loadAdmins();
+  });
+  showToast(t('saved')); closeModal('modal-admin'); renderAdmins();
+}
+async function deleteAdmin(id) {
+  if (!confirm('O\'chirilsinmi?')) return;
+  await withLoader(t('del')+'...', async () => {
+    await sb.from('admins').delete().eq('id', id);
+    await loadAdmins();
+  });
+  showToast(t('deleted')); renderAdmins();
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
+function populateStaffSelects() {
+  ['ci-staff','t-staff'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const isTask = id === 't-staff';
+    el.innerHTML = (isTask?'<option value="">Barcha xodimlar</option>':'') + staffList.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+  });
+}
+
+function populateBranchSelects() {
+  ['ci-branch'].forEach(id => populateBranchSelect(id));
+  populateReportBranch();
+}
+
+function populateBranchSelect(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.innerHTML = '<option value="">Filial tanlang</option>' + branches.map(b=>`<option value="${b.id}">${b.name}</option>`).join('');
+}
+
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+function cancelBranchPick() {
+  const ov = document.getElementById('modal-branch-pick');
+  closeModal('modal-branch-pick');
+  if (ov._onCancel) { const cb = ov._onCancel; ov._onCancel = null; cb(); }
+}
+
+// Close modal on overlay click
+document.querySelectorAll('.modal-overlay').forEach(ov => {
+  ov.addEventListener('click', e => { if (e.target === ov) ov.classList.remove('open'); });
+});
+
+// ============================================================
+// INIT
+// ============================================================
+window.addEventListener('DOMContentLoaded', () => {
+  // Temani darhol qo'llash (login ekranida ham to'g'ri ko'rinsin)
+  if (localStorage.getItem('theme') === 'dark') document.body.classList.add('dark');
+  const saved = localStorage.getItem('session');
+  if (saved) {
+    try { currentUser = JSON.parse(saved); afterLogin(); }
+    catch { document.getElementById('auth-screen').style.display='flex'; }
+  }
+  applyLang();
+  // Enter key for login
+  document.getElementById('pass-input').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+  // Remember last teacher/group
+  selectedTeacher = localStorage.getItem('lastTeacher');
+  selectedGroup = localStorage.getItem('lastGroup');
+});
+</script>
+</body>
+</html>
