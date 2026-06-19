@@ -214,3 +214,31 @@ select 'Akbar Toshmatov', 'xodim1', '1234', 'staff', 'Administrator'
 where not exists (select 1 from staff where login = 'xodim1');
 
 -- Super admin alohida (hardcoded in code): login: superadmin, parol: super123
+
+-- =============================================
+-- TASKS — bajarildi holati uchun
+-- =============================================
+alter table tasks add column if not exists done boolean default false;
+
+-- =============================================
+-- FK YUMSHATISH — filial o'chirilganda davomat/xodim buzilmasin
+-- (attendance va staff branch_id endi NULL bo'ladi, yozuv o'chmaydi)
+-- =============================================
+alter table attendance drop constraint if exists attendance_branch_id_fkey;
+alter table attendance add constraint attendance_branch_id_fkey
+  foreign key (branch_id) references branches(id) on delete set null;
+
+alter table staff drop constraint if exists staff_branch_id_fkey;
+alter table staff add constraint staff_branch_id_fkey
+  foreign key (branch_id) references branches(id) on delete set null;
+
+-- =============================================
+-- DEMO MA'LUMOTNI O'CHIRISH (test filial/xodimlardan qutulish)
+-- Faqat kerak bo'lsa, shu blokni qo'lda ishga tushiring:
+-- =============================================
+-- Demo xodimni o'chirish (avval uning davomatini):
+-- delete from attendance where staff_id in (select id from staff where login = 'xodim1');
+-- delete from staff where login = 'xodim1';
+
+-- Demo filiallarni o'chirish (endi FK set null bo'lgani uchun bemalol):
+-- delete from branches where name in ('Chilonzor filiali', 'Yunusobod filiali');

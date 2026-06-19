@@ -8,7 +8,6 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>JONY KIDS — EduPanel</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -147,6 +146,8 @@ body {
   box-shadow: var(--shadow-out-sm);
 }
 .btn:active { box-shadow: var(--shadow-press); transform: scale(0.985); }
+.btn:focus-visible { outline: none; box-shadow: var(--shadow-out-sm), 0 0 0 3px var(--accent); }
+#btn-checkin:focus-visible, #btn-checkout:focus-visible { box-shadow: var(--shadow-out-sm), 0 0 0 4px var(--accent); }
 .btn-primary { background: var(--accent); color: var(--accent-ink); box-shadow: var(--shadow-out-sm); }
 .btn-primary:active { filter: brightness(0.94); box-shadow: var(--shadow-press); }
 .btn-secondary { background: var(--card); color: var(--text); }
@@ -352,6 +353,7 @@ body {
 }
 .task-card.urgent { border-left: 4px solid var(--red); }
 .task-card.normal { border-left: 4px solid var(--accent2); }
+.task-card.done { border-left: 4px solid var(--green); }
 .task-meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
 .tag { font-size: 11px; padding: 4px 10px; border-radius: 8px; font-weight: 700; }
 .tag-blue { background: rgba(108,124,224,0.16); color: var(--blue); }
@@ -630,6 +632,19 @@ body {
   </div>
 </div>
 
+<!-- CONFIRM MODAL -->
+<div class="modal-overlay" id="modal-confirm" style="z-index:600;">
+  <div class="modal" style="max-width:360px;">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="confirm-title">Tasdiqlang</div>
+    <p id="confirm-text" style="font-size:13px;color:var(--text2);margin-bottom:20px;"></p>
+    <div style="display:flex;gap:10px;">
+      <button class="btn btn-secondary" id="confirm-no" style="flex:1;">Bekor</button>
+      <button class="btn btn-danger" id="confirm-yes" style="flex:1;">Ha, davom etish</button>
+    </div>
+  </div>
+</div>
+
 <!-- AUTH SCREEN -->
 <div id="auth-screen">
   <div class="auth-card">
@@ -666,6 +681,7 @@ body {
       <div id="user-role-badge"></div>
     </div>
     <div class="top-bar-right">
+      <button class="btn btn-icon btn-secondary" onclick="refreshAll(this)" title="Yangilash" id="btn-refresh" style="font-size:17px;">⟳</button>
       <button class="btn btn-icon btn-secondary" onclick="toggleTheme()" title="Tema" style="font-size:18px;">☀</button>
       <div class="avatar" id="user-avatar" onclick="showPage('settings')">?</div>
     </div>
@@ -1159,6 +1175,7 @@ body {
   <div class="modal">
     <div class="modal-handle"></div>
     <div id="task-detail-content"></div>
+    <div id="task-detail-actions" style="margin-bottom:12px;"></div>
     <div class="inp-group" id="reply-section">
       <label>Javob yozish</label>
       <textarea id="reply-input" rows="2" placeholder="Javobingiz..." style="resize:none;"></textarea>
@@ -1216,7 +1233,29 @@ let currentUser = null;
 let students = [], teachers = [], groups = [], staffList = [], branches = [], tasks = [], attendances = [], admins = [];
 let selectedStatus = null, selectedReason = null, selectedTeacher = null, selectedGroup = null;
 let selectedCIType = 'checkin', selectedTaskType = 'task';
-let currentStudentId = null, currentTaskId = null, currentEditStaffId = null;
+let currentStudentId = null, currentTaskId = null, currentEditStaffId = null, editingTaskId = null;
+
+// XSS himoyasi: HTML maxsus belgilarini xavfsizlash
+function esc(s) {
+  if (s == null) return '';
+  const d = document.createElement('div');
+  d.textContent = String(s);
+  return d.innerHTML;
+}
+
+// Custom tasdiqlash dialogi (brauzer confirm o'rniga) — Promise<boolean>
+function confirmDialog(title, text) {
+  return new Promise(resolve => {
+    document.getElementById('confirm-title').textContent = title || 'Tasdiqlang';
+    document.getElementById('confirm-text').textContent = text || '';
+    const yes = document.getElementById('confirm-yes');
+    const no = document.getElementById('confirm-no');
+    const cleanup = () => { yes.onclick = null; no.onclick = null; closeModal('modal-confirm'); };
+    yes.onclick = () => { cleanup(); resolve(true); };
+    no.onclick = () => { cleanup(); resolve(false); };
+    openModal('modal-confirm');
+  });
+}
 let filterStatusActive = null;
 let reportPeriod = 'daily';
 let notifEnabled = true;
@@ -1428,6 +1467,26 @@ async function doLogin() {
     document.getElementById('auth-error').style.display = 'block';
   } finally {
     restore();
+  }
+}
+
+// Top header — barcha ma'lumotni qayta yuklash
+async function refreshAll(btn) {
+  if (btn) { btn.style.transition = 'transform 0.6s'; btn.style.transform = 'rotate(360deg)'; }
+  try {
+    await loadAll();
+    const active = document.querySelector('.page.active');
+    const pid = active ? active.id.replace('page-','') : null;
+    if (pid === 'myattend') refreshMyAttendance();
+    else if (pid === 'students') { updateStats(); renderStudents(); }
+    else if (pid === 'tasks') { renderTasks(); markTasksSeen(); }
+    else if (pid === 'attendance') { loadAttendance(); loadLate(); }
+    else if (pid === 'admin') { renderStaff(); renderBranches(); renderAdmins(); }
+    showToast('Yangilandi', 1200, 'ok');
+  } catch (e) {
+    showToast('Yangilashda xatolik', 2500);
+  } finally {
+    if (btn) setTimeout(() => { btn.style.transition = 'none'; btn.style.transform = 'rotate(0deg)'; }, 600);
   }
 }
 
@@ -1869,7 +1928,7 @@ function editCurrentStudent() {
 
 async function deleteCurrentStudent() {
   if (!currentStudentId) return;
-  if (!confirm('O\'chirilsinmi?')) return;
+  if (!await confirmDialog('O\'chirilsinmi?', 'Bu amalni qaytarib bo\'lmaydi.')) return;
   await withLoader(t('del')+'...', async () => {
     await sb.from('students').delete().eq('id', currentStudentId);
     await loadStudents();
@@ -2070,11 +2129,30 @@ let myClockTimer = null;
 let myTodayRecords = [];
 
 // O'zbekiston (Tashkent, UTC+5) vaqtini olish
-function uzNow() {
-  // Hozirgi aniq vaqt (UTC) + 5 soat = Tashkent
-  const nowUtcMs = Date.now();
-  return new Date(nowUtcMs + 5 * 3600 * 1000);
+// Tashkent (Asia/Tashkent, UTC+5) vaqtini ishonchli olish.
+// Qurilma soatining vaqt zonasidan qat'i nazar, har doim Tashkent vaqtini qaytaradi.
+function uzParts(date) {
+  // Berilgan (yoki hozirgi) lahzani Tashkent zonasidagi qism-qismlarga ajratadi
+  const d = date || new Date();
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Tashkent', hour12: false,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', weekday: 'short'
+  });
+  const p = {};
+  fmt.formatToParts(d).forEach(x => { p[x.type] = x.value; });
+  let hour = parseInt(p.hour, 10);
+  if (hour === 24) hour = 0; // ba'zi muhitlarda 24:00 chiqadi
+  const dowMap = { Sun:0, Mon:1, Tue:2, Wed:3, Thu:4, Fri:5, Sat:6 };
+  return {
+    year: +p.year, month: +p.month, day: +p.day,
+    hour, minute: +p.minute, second: +p.second,
+    dow: dowMap[p.weekday] ?? 0,
+    dateStr: `${p.year}-${p.month}-${p.day}`
+  };
 }
+// Soat/daqiqa ko'rsatish uchun
+function uzNow() { return uzParts(); }
 
 function setupMyAttendance() {
   const initials = currentUser.name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
@@ -2088,21 +2166,24 @@ function setupMyAttendance() {
 
 function tickClock() {
   const n = uzNow();
-  const hh = String(n.getUTCHours()).padStart(2,'0');
-  const mm = String(n.getUTCMinutes()).padStart(2,'0');
-  const ss = String(n.getUTCSeconds()).padStart(2,'0');
+  const hh = String(n.hour).padStart(2,'0');
+  const mm = String(n.minute).padStart(2,'0');
+  const ss = String(n.second).padStart(2,'0');
   const clk = document.getElementById('my-clock');
   if (clk) clk.textContent = `${hh}:${mm}:${ss}`;
   const dt = document.getElementById('my-date');
-  if (dt) dt.textContent = n.toLocaleDateString('uz-UZ', { weekday:'long', day:'numeric', month:'long' });
+  if (dt) {
+    const dowNames = ['Yakshanba','Dushanba','Seshanba','Chorshanba','Payshanba','Juma','Shanba'];
+    const monNames = ['yanvar','fevral','mart','aprel','may','iyun','iyul','avgust','sentyabr','oktyabr','noyabr','dekabr'];
+    dt.textContent = `${dowNames[n.dow]}, ${n.day}-${monNames[n.month-1]}`;
+  }
 }
 
 async function refreshMyAttendance() {
-  // Bugungi (Tashkent) sanasi
+  // Bugungi (Tashkent) kun chegarasi. Tashkent UTC+5 (DST yo'q).
   const n = uzNow();
-  const dayStr = `${n.getUTCFullYear()}-${String(n.getUTCMonth()+1).padStart(2,'0')}-${String(n.getUTCDate()).padStart(2,'0')}`;
-  // Bugun 00:00 Tashkent = (kun - 5 soat) UTC
-  const fromUtc = new Date(Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate(), 0, 0, 0) - 5*3600*1000);
+  // Tashkent 00:00 = UTC (kun-1) 19:00
+  const fromUtc = new Date(`${n.dateStr}T00:00:00+05:00`);
   const toUtc = new Date(fromUtc.getTime() + 24*3600*1000);
   const { data } = await sb.from('attendance').select('*')
     .eq('staff_id', currentUser.id)
@@ -2134,6 +2215,12 @@ function renderMyToday() {
     outBtn.innerHTML = '⬇ Ketdim';
   }
 
+  // Fokusni faol (bosilishi mumkin) tugmaga qaratish
+  setTimeout(() => {
+    const target = session ? outBtn : inBtn;
+    if (target && !target.disabled) { try { target.focus({ preventScroll: true }); } catch(e){ try{target.focus();}catch(_){} } }
+  }, 50);
+
   // Holat ko'rsatkichi
   const banner = document.getElementById('my-state-banner');
   if (banner) {
@@ -2155,8 +2242,8 @@ function renderMyToday() {
   if (!myTodayRecords.length) { box.style.display = 'none'; return; }
   box.style.display = '';
   rows.innerHTML = myTodayRecords.map(r => {
-    const local = new Date(new Date(r.time).getTime() + 5*3600*1000);
-    const hm = String(local.getUTCHours()).padStart(2,'0') + ':' + String(local.getUTCMinutes()).padStart(2,'0');
+    const lp = uzParts(new Date(r.time));
+    const hm = String(lp.hour).padStart(2,'0') + ':' + String(lp.minute).padStart(2,'0');
     const isIn = r.type === 'checkin';
     return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;">
       <span style="font-weight:600;">${isIn ? '⬆ Keldim' : '⬇ Ketdim'}${r.branch_name?` <span style="color:var(--text2);font-weight:400;font-size:12px;">• ${r.branch_name}</span>`:''}</span>
@@ -2232,8 +2319,8 @@ async function myCheck(type) {
     // 3. Vaqt va kechikish (ish kunlari va smena vaqtlari bo'yicha)
     const nowUtc = new Date();
     const local = uzNow();
-    const hm = local.getUTCHours()*60 + local.getUTCMinutes();
-    const dow = local.getUTCDay(); // 0=Yakshanba ... 6=Shanba
+    const hm = local.hour*60 + local.minute;
+    const dow = local.dow; // 0=Yakshanba ... 6=Shanba
     let lateMin = 0;
     if (type === 'checkin' && currentUser.shifts) {
       const shifts = typeof currentUser.shifts === 'string' ? JSON.parse(currentUser.shifts) : currentUser.shifts;
@@ -2523,22 +2610,23 @@ function renderTasks() {
   if (!tasks.length) { el.innerHTML = `<div class="empty"><div class="empty-icon">📋</div><h3>${t('no_data')}</h3></div>`; return; }
   el.innerHTML = tasks.map(task => {
     const d = task.deadline ? new Date(task.deadline) : null;
-    const isUrgent = d && d < new Date();
+    const isUrgent = d && d < new Date() && !task.done;
     const typeLabel = { task:t('task'), note:t('note'), alert:t('alert') }[task.type] || task.type;
     const typeCls = { task:'tag-blue', note:'tag-blue', alert:'tag-red' }[task.type] || 'tag-blue';
     const created = task.created_at ? new Date(task.created_at).toLocaleDateString('uz-UZ',{day:'numeric',month:'short',year:'numeric'}) : '';
     const seen = seenTaskIds();
-    const isNew = !seen.includes(task.id);
-    return `<div class="task-card ${isUrgent?'urgent':'normal'}" onclick="openTaskDetail('${task.id}')">
+    const isNew = !seen.includes(task.id) && !task.done;
+    return `<div class="task-card ${task.done?'done':(isUrgent?'urgent':'normal')}" onclick="openTaskDetail('${task.id}')" style="${task.done?'opacity:0.6;':''}">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
-        ${isNew?`<span style="width:8px;height:8px;border-radius:50%;background:var(--red);flex-shrink:0;"></span>`:''}
-        <div style="font-size:14px;font-weight:700;">${task.title}</div>
+        ${task.done?`<span style="color:var(--green);flex-shrink:0;">✓</span>`:(isNew?`<span style="width:8px;height:8px;border-radius:50%;background:var(--red);flex-shrink:0;"></span>`:'')}
+        <div style="font-size:14px;font-weight:700;${task.done?'text-decoration:line-through;':''}">${esc(task.title)}</div>
       </div>
-      <div style="font-size:13px;color:var(--text2);margin-bottom:8px;">${(task.body||'').slice(0,80)}${task.body&&task.body.length>80?'...':''}</div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:8px;">${esc((task.body||'').slice(0,80))}${task.body&&task.body.length>80?'...':''}</div>
       <div class="task-meta">
         <span class="tag ${typeCls}">${typeLabel}</span>
-        ${task.assigned_name?`<span class="tag tag-blue">👤 ${task.assigned_name}</span>`:''}
+        ${task.assigned_name?`<span class="tag tag-blue">👤 ${esc(task.assigned_name)}</span>`:''}
         ${d?`<span class="tag ${isUrgent?'tag-red':'tag-yellow'}">⏰ ${d.toLocaleDateString('uz')}</span>`:''}
+        ${task.done?`<span class="tag" style="background:rgba(79,184,154,0.18);color:var(--green);">✓ Bajarilgan</span>`:''}
       </div>
       <div style="font-size:11px;color:var(--text3);margin-top:8px;">📅 Berilgan: ${created}</div>
     </div>`;
@@ -2546,6 +2634,9 @@ function renderTasks() {
 }
 
 function openAddTask() {
+  editingTaskId = null;
+  const titleEl = document.querySelector('#modal-task .modal-title');
+  if (titleEl) titleEl.textContent = 'Yangi vazifa';
   document.getElementById('t-title').value=''; document.getElementById('t-body').value='';
   document.getElementById('t-deadline').value='';
   selectedTaskType = 'task';
@@ -2570,17 +2661,26 @@ async function saveTask() {
   if (!title) { showToast('Sarlavha kerak!'); return; }
   const staffId = document.getElementById('t-staff').value;
   const staff = staffList.find(s=>s.id===staffId);
+  const obj = {
+    title, body: document.getElementById('t-body').value,
+    assigned_to: staffId||null, assigned_name: staff?.name||null,
+    type: selectedTaskType, deadline: document.getElementById('t-deadline').value||null
+  };
   await withLoader(t('save')+'...', async () => {
-    await sb.from('tasks').insert([{
-      title, body: document.getElementById('t-body').value,
-      assigned_to: staffId||null, assigned_name: staff?.name||null,
-      type: selectedTaskType, deadline: document.getElementById('t-deadline').value||null,
-      created_by: currentUser.id, replies: []
-    }]);
+    if (editingTaskId) {
+      const { error } = await sb.from('tasks').update(obj).eq('id', editingTaskId);
+      if (error) throw error;
+    } else {
+      const { error } = await sb.from('tasks').insert([{ ...obj, created_by: currentUser.id, replies: [], done: false }]);
+      if (error) throw error;
+    }
     await loadTasks();
   });
-  showToast(t('saved'));
+  showToast(t('saved'), 1500, 'ok');
+  editingTaskId = null;
   closeModal('modal-task');
+  showPage('tasks');
+  renderTasks();
 }
 
 function openTaskDetail(id) {
@@ -2589,17 +2689,82 @@ function openTaskDetail(id) {
   currentTaskId = id;
   const replies = task.replies || [];
   const d = task.deadline ? new Date(task.deadline) : null;
+  const isAdmin = currentUser.role === 'admin' || currentUser.role === 'superadmin';
   document.getElementById('task-detail-content').innerHTML = `
     <div style="margin-bottom:16px;">
-      <div style="font-size:18px;font-weight:700;margin-bottom:8px;">${task.title}</div>
-      <div style="font-size:14px;color:var(--text2);margin-bottom:12px;">${task.body||''}</div>
+      ${task.done?`<div class="tag" style="background:rgba(79,184,154,0.18);color:var(--green);display:inline-block;margin-bottom:8px;">✓ Bajarilgan</div>`:''}
+      <div style="font-size:18px;font-weight:700;margin-bottom:8px;">${esc(task.title)}</div>
+      <div style="font-size:14px;color:var(--text2);margin-bottom:12px;white-space:pre-wrap;">${esc(task.body||'')}</div>
+      ${task.assigned_name?`<div class="tag tag-blue" style="display:inline-block;margin-bottom:8px;">👤 ${esc(task.assigned_name)}</div>`:''}
       ${d?`<div class="tag tag-yellow" style="display:inline-block;margin-bottom:8px;">⏰ Muddat: ${d.toLocaleString('uz')}</div>`:''}
-      ${replies.length?`<div style="margin-top:12px;"><div style="font-size:12px;color:var(--text2);margin-bottom:8px;">Javoblar:</div>${replies.map(r=>`<div class="reply-box"><div class="reply-from">${r.from}</div><div class="reply-item">${r.text}</div></div>`).join('')}</div>`:''}
+      ${replies.length?`<div style="margin-top:12px;"><div style="font-size:12px;color:var(--text2);margin-bottom:8px;">Javoblar:</div>${replies.map(r=>`<div class="reply-box"><div class="reply-from">${esc(r.from)}</div><div class="reply-item">${esc(r.text)}</div></div>`).join('')}</div>`:''}
     </div>`;
-  const isAdmin = currentUser.role === 'admin' || currentUser.role === 'superadmin';
+
+  // Amal tugmalari
+  const actions = document.getElementById('task-detail-actions');
+  let html = '';
+  // Bajarildi/qaytarish — hamma (jumladan tayinlangan xodim)
+  if (task.done) {
+    html += `<button class="btn btn-secondary btn-full" onclick="toggleTaskDone(false)" style="margin-bottom:8px;">↩️ Bajarilmagan deb belgilash</button>`;
+  } else {
+    html += `<button class="btn btn-primary btn-full" onclick="toggleTaskDone(true)" style="margin-bottom:8px;">✓ Bajarildi</button>`;
+  }
+  // Tahrirlash/o'chirish — faqat admin
+  if (isAdmin) {
+    html += `<div style="display:flex;gap:8px;">
+      <button class="btn btn-secondary" onclick="editTask()" style="flex:1;">✏️ Tahrirlash</button>
+      <button class="btn btn-danger" onclick="deleteTask()" style="flex:1;">🗑 O'chirish</button>
+    </div>`;
+  }
+  actions.innerHTML = html;
+
   document.getElementById('reply-section').style.display = '';
   document.getElementById('reply-input').value = '';
   openModal('modal-task-detail');
+}
+
+// Bajarildi holatini almashtirish
+async function toggleTaskDone(done) {
+  if (!currentTaskId) return;
+  await withLoader(t('save')+'...', async () => {
+    const { error } = await sb.from('tasks').update({ done }).eq('id', currentTaskId);
+    if (error) throw error;
+    await loadTasks();
+  });
+  showToast(done ? '✓ Bajarildi deb belgilandi' : 'Qaytarildi', 1500, done?'ok':'');
+  closeModal('modal-task-detail');
+}
+
+// Vazifani tahrirlash (admin)
+function editTask() {
+  const task = tasks.find(x=>x.id===currentTaskId);
+  if (!task) return;
+  closeModal('modal-task-detail');
+  document.getElementById('t-title').value = task.title || '';
+  document.getElementById('t-body').value = task.body || '';
+  document.getElementById('t-deadline').value = task.deadline ? task.deadline.slice(0,16) : '';
+  selectedTaskType = task.type || 'task';
+  const labels = { task: t('task'), note: t('note'), alert: t('alert') };
+  document.querySelectorAll('#modal-task .pill-entity').forEach(p => p.classList.toggle('selected', p.textContent.trim() === labels[selectedTaskType]));
+  populateTaskStaff();
+  document.getElementById('t-staff').value = task.assigned_to || '';
+  editingTaskId = currentTaskId;
+  document.querySelector('#modal-task .modal-title').textContent = 'Vazifani tahrirlash';
+  openModal('modal-task');
+}
+
+// Vazifani o'chirish (admin)
+async function deleteTask() {
+  if (!currentTaskId) return;
+  const ok = await confirmDialog('Vazifa o\'chirilsinmi?', 'Bu amalni qaytarib bo\'lmaydi.');
+  if (!ok) return;
+  await withLoader(t('del')+'...', async () => {
+    const { error } = await sb.from('tasks').delete().eq('id', currentTaskId);
+    if (error) throw error;
+    await loadTasks();
+  });
+  showToast(t('deleted'), 1500);
+  closeModal('modal-task-detail');
 }
 
 async function sendReply() {
@@ -2674,7 +2839,7 @@ async function addTag(kind) {
 }
 
 async function deleteTag(id) {
-  if (!confirm('Teg o\'chirilsinmi?')) return;
+  if (!await confirmDialog('Teg o\'chirilsinmi?', '')) return;
   await withLoader(t('del')+'...', async () => {
     await sb.from('app_tags').delete().eq('id', id);
     await loadTags();
@@ -2776,12 +2941,15 @@ async function saveStaff() {
 }
 
 async function deleteStaff(id) {
-  if (!confirm('O\'chirilsinmi?')) return;
+  if (!await confirmDialog('Xodim o\'chirilsinmi?', 'Bu amalni qaytarib bo\'lmaydi.')) return;
+  let ok = false;
   await withLoader(t('del')+'...', async () => {
-    await sb.from('staff').delete().eq('id', id);
+    const { error } = await sb.from('staff').delete().eq('id', id);
+    if (error) throw error;
     await loadStaff();
-  });
-  showToast(t('deleted')); renderStaff();
+    ok = true;
+  }).catch(e => { showToast('O\'chirib bo\'lmadi: ' + (e.message||e.code||'xatolik'), 4000); });
+  if (ok) { showToast(t('deleted'), 1500); renderStaff(); }
 }
 
 // ============================================================
@@ -2825,12 +2993,20 @@ async function saveBranch() {
   showToast(t('saved')); closeModal('modal-branch'); renderBranches();
 }
 async function deleteBranch(id) {
-  if (!confirm('O\'chirilsinmi?')) return;
+  if (!await confirmDialog('Filial o\'chirilsinmi?', 'Bu amalni qaytarib bo\'lmaydi.')) return;
+  let ok = false;
   await withLoader(t('del')+'...', async () => {
-    await sb.from('branches').delete().eq('id', id);
+    const { error } = await sb.from('branches').delete().eq('id', id);
+    if (error) throw error;
     await loadBranches();
+    ok = true;
+  }).catch(e => {
+    const msg = (e.code === '23503' || /foreign key/i.test(e.message||''))
+      ? 'Bu filialga bog\'langan xodim yoki davomat bor. Avval ularni o\'chiring yoki boshqa filialga o\'tkazing.'
+      : 'O\'chirib bo\'lmadi: ' + (e.message||e.code||'xatolik');
+    showToast(msg, 5000);
   });
-  showToast(t('deleted')); renderBranches();
+  if (ok) { showToast(t('deleted'), 1500); renderBranches(); }
 }
 
 // ============================================================
@@ -2864,12 +3040,15 @@ async function saveAdmin() {
   showToast(t('saved')); closeModal('modal-admin'); renderAdmins();
 }
 async function deleteAdmin(id) {
-  if (!confirm('O\'chirilsinmi?')) return;
+  if (!await confirmDialog('Admin o\'chirilsinmi?', 'Bu amalni qaytarib bo\'lmaydi.')) return;
+  let ok = false;
   await withLoader(t('del')+'...', async () => {
-    await sb.from('admins').delete().eq('id', id);
+    const { error } = await sb.from('admins').delete().eq('id', id);
+    if (error) throw error;
     await loadAdmins();
-  });
-  showToast(t('deleted')); renderAdmins();
+    ok = true;
+  }).catch(e => { showToast('O\'chirib bo\'lmadi: ' + (e.message||e.code||'xatolik'), 4000); });
+  if (ok) { showToast(t('deleted'), 1500); renderAdmins(); }
 }
 
 // ============================================================
