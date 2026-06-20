@@ -2333,7 +2333,18 @@ async function myCheck(type) {
       const matches = findBranchesInRange(coords.latitude, coords.longitude);
       hideLoader();
       if (!matches.length) {
-        showToast('Siz hech qaysi filial hududida emassiz. Davomat qabul qilinmadi.', 4000);
+        // Aniq sabab: GPS'li filial bormi? Eng yaqini necha metr?
+        const withGps = branches.filter(b => b.lat != null && b.lng != null);
+        if (!withGps.length) {
+          showToast('Hech qaysi filialga GPS o\'rnatilmagan. Admin filialga joylashuv qo\'shishi kerak.', 5000);
+        } else {
+          let nearest = Infinity;
+          withGps.forEach(b => {
+            const d = distanceMeters(coords.latitude, coords.longitude, Number(b.lat), Number(b.lng));
+            if (d < nearest) nearest = d;
+          });
+          showToast(`Filial hududida emassiz. Eng yaqin filial ~${Math.round(nearest)}m uzoqda (ruxsat: ${GEOFENCE_DEFAULT_RADIUS}m).`, 5000);
+        }
         return;
       }
       // Har safar filial so'raladi (bitta bo'lsa ham tasdiqlash uchun)
@@ -3011,11 +3022,19 @@ async function saveBranch() {
   const lng = parseFloat(document.getElementById('br-lng').value);
   if (isNaN(lat) || isNaN(lng)) { showToast('Filial joylashuvini (GPS) belgilang!'); return; }
   const radius = parseInt(document.getElementById('br-radius').value) || GEOFENCE_DEFAULT_RADIUS;
+  let ok = false;
   await withLoader(t('save')+'...', async () => {
-    await sb.from('branches').insert([{ name, address: document.getElementById('br-address').value, lat, lng, radius }]);
+    const { error } = await sb.from('branches').insert([{ name, address: document.getElementById('br-address').value, lat, lng, radius }]);
+    if (error) throw error;
     await loadBranches();
+    ok = true;
+  }).catch(e => {
+    const msg = /column .* does not exist|lat|lng|radius/i.test(e.message||'')
+      ? 'Bazada GPS ustunlari yo\'q! supabase_setup.sql ni qayta ishga tushiring.'
+      : 'Saqlashda xatolik: ' + (e.message||e.code||'');
+    showToast(msg, 5000);
   });
-  showToast(t('saved')); closeModal('modal-branch'); renderBranches();
+  if (ok) { showToast(t('saved'), 1500, 'ok'); closeModal('modal-branch'); renderBranches(); }
 }
 async function deleteBranch(id) {
   if (!await confirmDialog('Filial o\'chirilsinmi?', 'Bu amalni qaytarib bo\'lmaydi.')) return;
