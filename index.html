@@ -2359,18 +2359,34 @@ async function myCheck(type) {
     const dow = local.dow; // 0=Yakshanba ... 6=Shanba
     let lateMin = 0;
     if (type === 'checkin' && currentUser.shifts) {
-      const shifts = typeof currentUser.shifts === 'string' ? JSON.parse(currentUser.shifts) : currentUser.shifts;
-      // Bugungi kunga to'g'ri keladigan smenalar
-      const todayShifts = (shifts||[]).filter(sh => {
-        if (!sh.start) return false;
-        if (!sh.days || !sh.days.length) return true; // kun belgilanmagan bo'lsa har kun
-        return sh.days.includes(dow);
+      let shifts = currentUser.shifts;
+      if (typeof shifts === 'string') { try { shifts = JSON.parse(shifts); } catch(_) { shifts = []; } }
+      if (!Array.isArray(shifts)) shifts = [];
+
+      // Bugungi kunга to'g'ri keladigan smenalar (start va end bor)
+      const todayShifts = shifts.filter(sh => {
+        if (!sh || !sh.start) return false;
+        if (!sh.days || !sh.days.length) return true;
+        return sh.days.some(d => Number(d) === dow);
       });
+
+      // Xodim qaysi smena "oynasi"ga tushadi? (start-180min dan end gacha)
+      // Smena boshlanishidan oldin kelsa — hech qachon kech emas.
+      let chosenDiff = null;
       todayShifts.forEach(sh => {
-        const [h,m] = sh.start.split(':').map(Number);
-        const expected = h*60+m;
-        if (hm > expected + 5) lateMin = lateMin===0 ? hm-expected : Math.min(lateMin, hm-expected);
+        const [sh_h, sh_m] = sh.start.split(':').map(Number);
+        const startMin = sh_h*60 + sh_m;
+        let endMin = startMin + 240; // end yo'q bo'lsa, +4 soat deb hisoblaymiz
+        if (sh.end) { const [eh, em] = sh.end.split(':').map(Number); endMin = eh*60 + em; }
+        const winStart = startMin - 180; // smenadan 3 soat oldin kelishi mumkin
+        if (hm >= winStart && hm <= endMin) {
+          const diff = hm - startMin; // + kech, - erta
+          // eng mos smena: kechikishi eng kam bo'lgani (erta = manfiy, afzal)
+          if (chosenDiff === null || diff < chosenDiff) chosenDiff = diff;
+        }
       });
+      // Faqat tanlangan smenadan 5 daqiqadan ko'p kech kelса
+      if (chosenDiff !== null && chosenDiff > 5) lateMin = chosenDiff;
     }
 
     // 3b. Kech kelgan bo'lsa — sabab majburiy
