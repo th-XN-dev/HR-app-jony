@@ -624,6 +624,28 @@ body {
   </div>
 </div>
 
+<!-- SHIFT PICK MODAL (bir nechta smena mos kelganda) -->
+<div class="modal-overlay" id="modal-shift-pick">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Ish vaqtini tanlang</div>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:16px;">Qaysi smenaga keldingiz?</p>
+    <div id="shift-pick-list"></div>
+    <button class="btn btn-secondary btn-full" onclick="cancelShiftPick()" style="margin-top:6px;">Bekor qilish</button>
+  </div>
+</div>
+
+<!-- INFO MODAL (juda erta / hududda emas — yo'qolmaydigan eslatma) -->
+<div class="modal-overlay" id="modal-info">
+  <div class="modal" style="max-width:380px;text-align:center;">
+    <div class="modal-handle"></div>
+    <div id="info-icon" style="font-size:44px;margin-bottom:10px;">⏰</div>
+    <div class="modal-title" id="info-title" style="text-align:center;">Eslatma</div>
+    <p id="info-text" style="font-size:14px;color:var(--text2);margin-bottom:20px;line-height:1.5;"></p>
+    <button class="btn btn-primary btn-full" onclick="closeModal('modal-info')">Tushunarli</button>
+  </div>
+</div>
+
 <!-- LATE REASON MODAL (xodim kech kelganda) -->
 <div class="modal-overlay" id="modal-late-reason">
   <div class="modal" style="max-width:420px;">
@@ -2038,6 +2060,39 @@ function findBranchesInRange(lat, lng) {
   return list;
 }
 
+// Bir nechta smena mos kelganda — xodim qaysisini tanlaydi (Promise)
+let _shiftResolve = null;
+function pickShift(candidates) {
+  return new Promise(resolve => {
+    _shiftResolve = resolve;
+    const box = document.getElementById('shift-pick-list');
+    box.innerHTML = candidates.map((c, i) => {
+      const statusTxt = c.lateMin > 0
+        ? `<span style="color:var(--red);font-size:12px;">${c.lateMin} min kech</span>`
+        : c.earlyMin > 0
+          ? `<span style="color:var(--green);font-size:12px;">${c.earlyMin} min oldin</span>`
+          : `<span style="color:var(--green);font-size:12px;">Vaqtida</span>`;
+      return `<button class="btn btn-secondary btn-full" style="margin-bottom:10px;justify-content:space-between;" data-idx="${i}">
+        <span>🕐 ${c.shift.label}</span>${statusTxt}
+      </button>`;
+    }).join('');
+    box.querySelectorAll('button').forEach(btnEl => {
+      btnEl.onclick = () => {
+        const c = candidates[Number(btnEl.dataset.idx)];
+        closeModal('modal-shift-pick');
+        const r = _shiftResolve; _shiftResolve = null;
+        if (r) r(c);
+      };
+    });
+    openModal('modal-shift-pick');
+  });
+}
+function cancelShiftPick() {
+  closeModal('modal-shift-pick');
+  const r = _shiftResolve; _shiftResolve = null;
+  if (r) r(null);
+}
+
 // Bir nechta filial radiusida bo'lsa — xodim qaysisini tanlaydi (Promise)
 function pickBranch(matches) {
   return new Promise(resolve => {
@@ -2098,7 +2153,7 @@ function cancelLateReason() {
 }
 
 // Motivatsion / tanbeh xabari (yuqorida kichik message)
-function motivationalMessage(type, lateMin) {
+function motivationalMessage(type, lateMin, earlyMin) {
   let msg, dur = 3500, kind = 'ok';
   if (type === 'checkin') {
     if (lateMin > 0) {
@@ -2110,6 +2165,9 @@ function motivationalMessage(type, lateMin) {
       ];
       msg = tanbeh[Math.floor(Math.random()*tanbeh.length)];
       dur = 5000;
+    } else if (earlyMin && earlyMin > 0) {
+      msg = `Ofarin! Ish vaqtidan ${earlyMin} daqiqa oldin keldingiz 👏 Barakali ish kuni bo'lsin!`;
+      dur = 4000;
     } else {
       const rahmat = [
         `Xush kelibsiz! O'z vaqtida kelganingiz uchun rahmat 🌟`,
@@ -2287,6 +2345,61 @@ function openSession() {
   return last.type === 'checkin' ? last : null;
 }
 
+// Yo'qolmaydigan eslatma modali (close tugmali)
+function infoModal(title, text, icon) {
+  document.getElementById('info-title').textContent = title || 'Eslatma';
+  document.getElementById('info-text').textContent = text || '';
+  document.getElementById('info-icon').textContent = icon || '⏰';
+  openModal('modal-info');
+}
+
+const EARLY_LIMIT_MIN = 60; // smenadan necha daqiqa oldin kelishga ruxsat
+
+// Bugun qaysi smenalar bor (ish kunlari bo'yicha), boshlanish vaqti bilan tartiblangan
+function todayShiftsFor(dow) {
+  let shifts = currentUser.shifts;
+  if (typeof shifts === 'string') { try { shifts = JSON.parse(shifts); } catch(_) { shifts = []; } }
+  if (!Array.isArray(shifts)) shifts = [];
+  const list = shifts.filter(sh => {
+    if (!sh || !sh.start) return false;
+    if (!sh.days || !sh.days.length) return true; // kun belgilanmagan = har kun
+    return sh.days.some(d => Number(d) === dow);
+  }).map(sh => {
+    const [sh_h, sh_m] = sh.start.split(':').map(Number);
+    let endMin = sh_h*60+sh_m + 240;
+    if (sh.end) { const [eh,em] = sh.end.split(':').map(Number); endMin = eh*60+em; }
+    return { start: sh.start, end: sh.end || '', startMin: sh_h*60+sh_m, endMin, label: sh.start + (sh.end?('–'+sh.end):'') };
+  });
+  list.sort((a,b) => a.startMin - b.startMin);
+  return list;
+}
+
+// Keldim uchun smenalarni tahlil qilish.
+// Qaytaradi: { tooEarly, nearestStart, candidates:[{shift, lateMin, earlyMin}] }
+function analyzeCheckinShifts(hm, dow) {
+  const shifts = todayShiftsFor(dow);
+  if (!shifts.length) return { noShifts: true, candidates: [] };
+  // Mos smenalar: kelish vaqti [start - 60min] dan [end] gacha bo'lганлар
+  const candidates = [];
+  let nearestStart = null;
+  shifts.forEach(sh => {
+    const fromOk = hm >= (sh.startMin - EARLY_LIMIT_MIN);
+    const toOk = hm <= sh.endMin;
+    if (fromOk && toOk) {
+      const diff = hm - sh.startMin; // + kech, - erta
+      candidates.push({ shift: sh, lateMin: diff > 0 ? diff : 0, earlyMin: diff < 0 ? -diff : 0 });
+    }
+    // Eng yaqin kelajakdagi smena (juda erta xabari uchun)
+    if (sh.startMin > hm && (nearestStart === null || sh.startMin < nearestStart)) nearestStart = sh.startMin;
+  });
+  return { candidates, nearestStart, shifts };
+}
+
+function minToHHMM(min) {
+  const h = Math.floor(min/60), m = min%60;
+  return String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0');
+}
+
 async function myCheck(type) {
   const session = openSession();
 
@@ -2336,14 +2449,15 @@ async function myCheck(type) {
         // Aniq sabab: GPS'li filial bormi? Eng yaqini necha metr?
         const withGps = branches.filter(b => b.lat != null && b.lng != null);
         if (!withGps.length) {
-          showToast('Hech qaysi filialga GPS o\'rnatilmagan. Admin filialga joylashuv qo\'shishi kerak.', 5000);
+          infoModal('GPS o\'rnatilmagan', 'Hech qaysi filialga joylashuv (GPS) o\'rnatilmagan. Iltimos, administrator bilan bog\'laning — u filialga joylashuvni qo\'shishi kerak.', '📍');
         } else {
           let nearest = Infinity;
           withGps.forEach(b => {
             const d = distanceMeters(coords.latitude, coords.longitude, Number(b.lat), Number(b.lng));
             if (d < nearest) nearest = d;
           });
-          showToast(`Filial hududida emassiz. Eng yaqin filial ~${Math.round(nearest)}m uzoqda (ruxsat: ${GEOFENCE_DEFAULT_RADIUS}m).`, 5000);
+          infoModal('Filial hududida emassiz',
+            `Siz hech qaysi filial hududida emassiz, shuning uchun davomat qabul qilinmadi.\n\nEng yaqin filial ~${Math.round(nearest)} metr uzoqda (ruxsat etilgan masofa: ${GEOFENCE_DEFAULT_RADIUS} metr).\n\nIltimos, filial hududiga kiring va qayta urinib ko'ring.`, '📍');
         }
         return;
       }
@@ -2352,41 +2466,41 @@ async function myCheck(type) {
       if (!chosenBranch) return; // bekor qildi — finally restore qiladi
     }
 
-    // 3. Vaqt va kechikish (ish kunlari va smena vaqtlari bo'yicha)
+    // 3. Vaqt va smena tahlili (faqat Keldim uchun)
     const nowUtc = new Date();
     const local = uzNow();
     const hm = local.hour*60 + local.minute;
     const dow = local.dow; // 0=Yakshanba ... 6=Shanba
-    let lateMin = 0;
-    if (type === 'checkin' && currentUser.shifts) {
-      let shifts = currentUser.shifts;
-      if (typeof shifts === 'string') { try { shifts = JSON.parse(shifts); } catch(_) { shifts = []; } }
-      if (!Array.isArray(shifts)) shifts = [];
+    let lateMin = 0, earlyMin = 0;
 
-      // Bugungi kunга to'g'ri keladigan smenalar (start va end bor)
-      const todayShifts = shifts.filter(sh => {
-        if (!sh || !sh.start) return false;
-        if (!sh.days || !sh.days.length) return true;
-        return sh.days.some(d => Number(d) === dow);
-      });
-
-      // Xodim qaysi smena "oynasi"ga tushadi? (start-180min dan end gacha)
-      // Smena boshlanishidan oldin kelsa — hech qachon kech emas.
-      let chosenDiff = null;
-      todayShifts.forEach(sh => {
-        const [sh_h, sh_m] = sh.start.split(':').map(Number);
-        const startMin = sh_h*60 + sh_m;
-        let endMin = startMin + 240; // end yo'q bo'lsa, +4 soat deb hisoblaymiz
-        if (sh.end) { const [eh, em] = sh.end.split(':').map(Number); endMin = eh*60 + em; }
-        const winStart = startMin - 180; // smenadan 3 soat oldin kelishi mumkin
-        if (hm >= winStart && hm <= endMin) {
-          const diff = hm - startMin; // + kech, - erta
-          // eng mos smena: kechikishi eng kam bo'lgani (erta = manfiy, afzal)
-          if (chosenDiff === null || diff < chosenDiff) chosenDiff = diff;
+    if (type === 'checkin') {
+      const an = analyzeCheckinShifts(hm, dow);
+      if (!an.noShifts) {
+        if (!an.candidates.length) {
+          // Hech qaysi smena oynasiga tushmadi
+          if (an.nearestStart !== null) {
+            // Kelajakda smena bor, lekin 1 soatdan ko'p oldin keldi → JUDA ERTA (modal, rad)
+            const startStr = minToHHMM(an.nearestStart);
+            const oldin = an.nearestStart - hm;
+            infoModal('Hali erta',
+              `Ish vaqtingiz boshlanishiga ancha bor (${startStr}). Iltimos, ish vaqtingiz boshlanishiga yaqinroq (1 soat ichida) bo'lganда yo'qlamadan o'ting.\n\nHozir: ${minToHHMM(hm)} — boshlanishigacha ${oldin} daqiqa.`,
+              '🕐');
+            return;
+          }
+          // Bugun smenalar bor edi, lekin hammasi o'tib ketgan (end o'tgan) — baribir yozamiz, kech emas
+        } else {
+          // Mos smena(lar) bor. Bittadan ko'p bo'lsa — tanlatamiz.
+          let chosen;
+          if (an.candidates.length === 1) {
+            chosen = an.candidates[0];
+          } else {
+            chosen = await pickShift(an.candidates);
+            if (!chosen) return; // bekor
+          }
+          lateMin = chosen.lateMin;   // bardosh 0 — har daqiqa kech
+          earlyMin = chosen.earlyMin;
         }
-      });
-      // Faqat tanlangan smenadan 5 daqiqadan ko'p kech kelса
-      if (chosenDiff !== null && chosenDiff > 5) lateMin = chosenDiff;
+      }
     }
 
     // 3b. Kech kelgan bo'lsa — sabab majburiy
@@ -2417,11 +2531,22 @@ async function myCheck(type) {
     });
 
     // 5. Motivatsion xabar
-    motivationalMessage(type, lateMin);
+    motivationalMessage(type, lateMin, earlyMin);
     await refreshMyAttendance();
   } catch (e) {
     hideLoader();
-    showToast(t('error'));
+    const m = (e && (e.message || e.code || e.details)) ? (e.message || e.details || e.code) : '';
+    let msg = 'Xatolik yuz berdi.';
+    if (/column .* does not exist|late_reason|late_comment|lat|lng/i.test(m)) {
+      msg = 'Bazada yangi ustunlar yo\'q (late_reason/lat/lng). supabase_setup.sql ni qayta ishga tushiring.';
+    } else if (/row-level security|rls|policy|permission/i.test(m)) {
+      msg = 'Bazaga yozishga ruxsat yo\'q (RLS). supabase_setup.sql ni qayta ishga tushiring.';
+    } else if (/network|fetch|failed to fetch/i.test(m)) {
+      msg = 'Internet aloqasi yo\'q. Qayta urinib ko\'ring.';
+    } else if (m) {
+      msg = 'Xatolik: ' + m;
+    }
+    showToast(msg, 5000);
   } finally {
     restore();
     renderMyToday();
