@@ -2472,6 +2472,18 @@ function minToHHMM(min) {
 }
 
 async function myCheck(type) {
+  // Smena ma'lumotini bazadan yangilaymiz (admin yangilagan bo'lsa, darhol kuchga kirsin).
+  // localStorage'dagi eski shifts'ga ishonmaymiz.
+  if (type === 'checkin') {
+    try {
+      const { data: fresh } = await sb.from('staff').select('shifts').eq('id', currentUser.id).single();
+      if (fresh && 'shifts' in fresh) {
+        currentUser.shifts = fresh.shifts;
+        localStorage.setItem('session', JSON.stringify(currentUser));
+      }
+    } catch(e) { console.warn('shifts yangilash:', e); }
+  }
+
   let session = openSession();
 
   // Keldim bosilganda: avval unutilgan eski sessiyani avtomatik yopishga urinamiz
