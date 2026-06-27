@@ -2158,13 +2158,8 @@ function motivationalMessage(type, lateMin, earlyMin) {
   if (type === 'checkin') {
     if (lateMin > 0) {
       kind = 'warn';
-      const tanbeh = [
-        `Bugun ${lateMin} daqiqa kech qoldingiz. Iltimos, ishga mas'uliyat bilan yondashing 🙏`,
-        `Kechikish ish sifatiga ta'sir qiladi. Ertaga o'z vaqtida kelishga harakat qiling ⏰`,
-        `Vaqt — eng qimmatli resurs. Keyingi safar o'z vaqtida bo'laylik 💪`
-      ];
-      msg = tanbeh[Math.floor(Math.random()*tanbeh.length)];
-      dur = 5000;
+      msg = `Bugun ish vaqtidan ${lateMin} daqiqa kech keldingiz. Davomatga qayd etildi.`;
+      dur = 4000;
     } else if (earlyMin && earlyMin > 0) {
       msg = `Ofarin! Ish vaqtidan ${earlyMin} daqiqa oldin keldingiz 👏 Barakali ish kuni bo'lsin!`;
       dur = 4000;
@@ -2263,6 +2258,8 @@ function tickClock() {
 }
 
 async function refreshMyAttendance() {
+  // Avval unutilgan (eski) sessiyani avtomatik yopamiz
+  try { await autoCloseStaleSession(); } catch(e) { console.warn(e); }
   // Bugungi (Tashkent) kun chegarasi. Tashkent UTC+5 (DST yo'q).
   const n = uzNow();
   // Tashkent 00:00 = UTC (kun-1) 19:00
@@ -2328,11 +2325,12 @@ function renderMyToday() {
     const lp = uzParts(new Date(r.time));
     const hm = String(lp.hour).padStart(2,'0') + ':' + String(lp.minute).padStart(2,'0');
     const isIn = r.type === 'checkin';
+    const autoClosed = r.auto_closed;
     return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;">
       <span style="font-weight:600;">${isIn ? '⬆ Keldim' : '⬇ Ketdim'}${r.branch_name?` <span style="color:var(--text2);font-weight:400;font-size:12px;">• ${r.branch_name}</span>`:''}</span>
       <span style="display:flex;gap:6px;align-items:center;">
         <span class="time-badge">${hm}</span>
-        ${r.late_minutes>0?`<span class="late-badge">+${r.late_minutes} min</span>`:(isIn?`<span class="on-time-badge">Vaqtida</span>`:'')}
+        ${autoClosed?`<span class="late-badge" title="Avtomatik yopilgan">⚠ Tugatmagan</span>`:(r.late_minutes>0?`<span class="late-badge">+${r.late_minutes} min</span>`:(isIn?`<span class="on-time-badge">Vaqtida</span>`:''))}
       </span>
     </div>`;
   }).join('');
@@ -2343,6 +2341,79 @@ function openSession() {
   if (!myTodayRecords.length) return null;
   const last = myTodayRecords[myTodayRecords.length - 1];
   return last.type === 'checkin' ? last : null;
+}
+
+const AUTO_CLOSE_GRACE_MIN = 60; // smena tugaganidan keyin necha daqiqa kutib avtomatik yopish
+
+// Berilgan checkin yozuvi uchun smena davomiyligini (daqiqalarда) aniqlash.
+// Checkin vaqtidagi kunга tegishli smenalardан, eng yaqin boshlanишли smena olinади.
+function shiftDurationForCheckin(rec) {
+  let shifts = currentUser.shifts;
+  if (typeof shifts === 'string') { try { shifts = JSON.parse(shifts); } catch(_) { shifts = []; } }
+  if (!Array.isArray(shifts)) shifts = [];
+  if (!shifts.length) return null; // smenasiz xodim — avtomatik yopilmaydi
+
+  const p = uzParts(new Date(rec.time)); // checkin vaqti (Tashkent)
+  const checkinMin = p.hour*60 + p.minute;
+  const dow = p.dow;
+
+  // O'sha kunга tegishli, start/end bor smenalar
+  const today = shifts.filter(sh => {
+    if (!sh || !sh.start || !sh.end) return false;
+    if (!sh.days || !sh.days.length) return true;
+    return sh.days.some(d => Number(d) === dow);
+  }).map(sh => {
+    const [a,b] = sh.start.split(':').map(Number);
+    const [c,d] = sh.end.split(':').map(Number);
+    let dur = (c*60+d) - (a*60+b);
+    if (dur <= 0) dur += 24*60; // yarim tundan o'tsa
+    return { startMin: a*60+b, dur };
+  });
+  if (!today.length) return null;
+
+  // Checkin vaqtiga eng yaqin (boshlanishi) smenani tanlaymiz
+  let best = today[0];
+  today.forEach(sh => {
+    if (Math.abs(sh.startMin - checkinMin) < Math.abs(best.startMin - checkinMin)) best = sh;
+  });
+  return best.dur; // daqiqalarда
+}
+
+// Unutilgan Ketdimni avtomatik yopish.
+// Eng oxirgi ochiq checkin (sanaдан qat'i nazar) ni tekshiradi.
+// Smena tugashidan AUTO_CLOSE_GRACE_MIN o'tган bo'lsa — avtomatik Ketdim qo'shadi.
+// Qaytaradi: true (yopildi) yoki false.
+async function autoCloseStaleSession() {
+  // Eng oxirgi yozuvni olamiz (har qanday sanadan)
+  const { data: lastArr } = await sb.from('attendance').select('*')
+    .eq('staff_id', currentUser.id)
+    .order('time', { ascending: false })
+    .limit(1);
+  const last = lastArr && lastArr[0];
+  if (!last || last.type !== 'checkin') return false; // ochiq sessiya yo'q
+
+  const dur = shiftDurationForCheckin(last);
+  if (dur == null) return false; // smenasiz — avtomatik yopilmaydi
+
+  const checkinTime = new Date(last.time).getTime();
+  const expectedOut = checkinTime + dur*60*1000;        // smena tugashi (taxminiy)
+  const deadline = expectedOut + AUTO_CLOSE_GRACE_MIN*60*1000; // + 1 soat sabr
+  if (Date.now() < deadline) return false; // hali muddati o'tmagan
+
+  // Avtomatik Ketdim: vaqt = checkin + smena davomiyligi
+  const autoOutTime = new Date(expectedOut).toISOString();
+  const { error } = await sb.from('attendance').insert([{
+    staff_id: currentUser.id,
+    staff_name: currentUser.name,
+    branch_id: last.branch_id || null,
+    branch_name: last.branch_name || null,
+    type: 'checkout',
+    time: autoOutTime,
+    late_minutes: 0,
+    auto_closed: true
+  }]);
+  if (error) { console.warn('autoClose:', error); return false; }
+  return true;
 }
 
 // Yo'qolmaydigan eslatma modali (close tugmali)
@@ -2401,7 +2472,16 @@ function minToHHMM(min) {
 }
 
 async function myCheck(type) {
-  const session = openSession();
+  let session = openSession();
+
+  // Keldim bosilganda: avval unutilgan eski sessiyani avtomatik yopishga urinamiz
+  if (type === 'checkin' && session) {
+    const closed = await autoCloseStaleSession();
+    if (closed) {
+      await refreshMyAttendance();
+      session = openSession(); // qayta tekshiramiz
+    }
+  }
 
   // Tartib tekshiruvi
   if (type === 'checkin' && session) {
@@ -2474,43 +2554,33 @@ async function myCheck(type) {
     let lateMin = 0, earlyMin = 0;
 
     if (type === 'checkin') {
-      const an = analyzeCheckinShifts(hm, dow);
-      if (!an.noShifts) {
-        if (!an.candidates.length) {
-          // Hech qaysi smena oynasiga tushmadi
-          if (an.nearestStart !== null) {
-            // Kelajakda smena bor, lekin 1 soatdan ko'p oldin keldi → JUDA ERTA (modal, rad)
-            const startStr = minToHHMM(an.nearestStart);
-            const oldin = an.nearestStart - hm;
-            infoModal('Hali erta',
-              `Ish vaqtingiz boshlanishiga ancha bor (${startStr}). Iltimos, ish vaqtingiz boshlanishiga yaqinroq (1 soat ichida) bo'lganда yo'qlamadan o'ting.\n\nHozir: ${minToHHMM(hm)} — boshlanishigacha ${oldin} daqiqa.`,
-              '🕐');
-            return;
+      const shifts = todayShiftsFor(dow);
+      if (shifts.length) {
+        // 1) Kelgan vaqt qaysidir smena oynasiga (start-60min .. end) tushsa — o'sha smena.
+        // 2) Hech qaysiga tushmasa va oldinda smena bo'lsa — keyingi smenaga ERTA.
+        // 3) Hammasi o'tib ketgan bo'lsa — eng oxirgisiga nisbatan (kech).
+        let chosen = null;
+        // Oynaga tushadiganlar
+        shifts.forEach(sh => {
+          if (hm >= (sh.startMin - EARLY_LIMIT_MIN) && hm <= sh.endMin) {
+            if (chosen === null || Math.abs(hm - sh.startMin) < Math.abs(hm - chosen.startMin)) chosen = sh;
           }
-          // Bugun smenalar bor edi, lekin hammasi o'tib ketgan (end o'tgan) — baribir yozamiz, kech emas
-        } else {
-          // Mos smena(lar) bor. Bittadan ko'p bo'lsa — tanlatamiz.
-          let chosen;
-          if (an.candidates.length === 1) {
-            chosen = an.candidates[0];
-          } else {
-            chosen = await pickShift(an.candidates);
-            if (!chosen) return; // bekor
-          }
-          lateMin = chosen.lateMin;   // bardosh 0 — har daqiqa kech
-          earlyMin = chosen.earlyMin;
+        });
+        // Oynaga tushmasa — kelajakdagi eng yaqin smena (erta kelgan)
+        if (!chosen) {
+          let next = null;
+          shifts.forEach(sh => { if (sh.startMin > hm && (next === null || sh.startMin < next.startMin)) next = sh; });
+          if (next) chosen = next;
+          else chosen = shifts[shifts.length - 1]; // hammasi o'tib ketgan — oxirgisi
         }
+        const diff = hm - chosen.startMin; // + kech, - erta
+        if (diff > 0) lateMin = diff;
+        else if (diff < 0) earlyMin = -diff;
       }
     }
 
-    // 3b. Kech kelgan bo'lsa — sabab majburiy
+    // Sabab so'ralmaydi — kech bo'lsa ham jim yoziladi (hisobotda ko'rinadi)
     let lateReason = null, lateComment = null;
-    if (type === 'checkin' && lateMin > 0) {
-      const res = await pickLateReason(lateMin);
-      if (!res) return; // bekor qildi — finally restore qiladi
-      lateReason = res.reason;
-      lateComment = res.comment;
-    }
 
     // 4. Saqlash
     await withLoader(t('save')+'...', async () => {
@@ -2747,7 +2817,7 @@ function renderReportTable(data) {
         return `<tr>
           <td style="padding:8px 4px;border-bottom:1px solid var(--card-border);">${r.staff_name||'-'}</td>
           <td style="padding:8px 4px;border-bottom:1px solid var(--card-border);color:var(--text2);">${r.branch_name||'-'}</td>
-          <td style="padding:8px 4px;border-bottom:1px solid var(--card-border);">${r.type==='checkin'?'⬆ Keldi':'⬇ Ketdi'}</td>
+          <td style="padding:8px 4px;border-bottom:1px solid var(--card-border);">${r.type==='checkin'?'⬆ Keldi':'⬇ Ketdi'}${r.auto_closed?' <span style="color:var(--yellow);font-size:11px;">(avto)</span>':''}</td>
           <td style="padding:8px 4px;border-bottom:1px solid var(--card-border);">${d.toLocaleDateString('uz')} ${d.toLocaleTimeString('uz',{hour:'2-digit',minute:'2-digit'})}</td>
           <td style="padding:8px 4px;border-bottom:1px solid var(--card-border);text-align:right;">${r.late_minutes>0?`<span class="late-badge">+${r.late_minutes}min</span>`:''}</td>
           <td style="padding:8px 4px;border-bottom:1px solid var(--card-border);">${reasonCell}</td>
