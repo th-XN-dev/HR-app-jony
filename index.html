@@ -800,6 +800,7 @@ body {
         <div class="tab active" onclick="switchAttTab('checkin')" id="att-tab-checkin">Kelish/Ketish</div>
         <div class="tab" onclick="switchAttTab('report')" id="att-tab-report">Hisobot</div>
         <div class="tab" onclick="switchAttTab('late')" id="att-tab-late">Kechikkan</div>
+        <div class="tab" onclick="switchAttTab('issues')" id="att-tab-issues">Muammoli</div>
       </div>
       <!-- CHECK IN TAB -->
       <div id="att-checkin">
@@ -815,6 +816,17 @@ body {
           <button class="report-btn active" onclick="setReportPeriod('daily')" id="rp-daily">Kunlik</button>
           <button class="report-btn" onclick="setReportPeriod('weekly')" id="rp-weekly">Haftalik</button>
           <button class="report-btn" onclick="setReportPeriod('monthly')" id="rp-monthly">Oylik</button>
+          <button class="report-btn" onclick="setReportPeriod('custom')" id="rp-custom">Sana</button>
+        </div>
+        <div id="report-date-range" style="display:none;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+          <input type="date" id="report-from" onchange="loadReport()" style="flex:1;min-width:130px;padding:9px 12px;border-radius:12px;border:none;background:var(--inset-bg);color:var(--text);box-shadow:var(--shadow-in);font-family:'Manrope',sans-serif;font-size:13px;">
+          <input type="date" id="report-to" onchange="loadReport()" style="flex:1;min-width:130px;padding:9px 12px;border-radius:12px;border:none;background:var(--inset-bg);color:var(--text);box-shadow:var(--shadow-in);font-family:'Manrope',sans-serif;font-size:13px;">
+        </div>
+        <div class="inp-group">
+          <label>Xodim</label>
+          <select id="report-staff" onchange="loadReport()">
+            <option value="">Barcha xodimlar</option>
+          </select>
         </div>
         <div class="inp-group">
           <label>Filial</label>
@@ -822,11 +834,24 @@ body {
             <option value="">Barcha filiallar</option>
           </select>
         </div>
-        <button class="btn btn-secondary btn-full" onclick="exportExcel()" style="margin-bottom:14px;">
-          📊 Excel yuklab olish
+        <div class="inp-group">
+          <label>Holat</label>
+          <select id="report-status" onchange="loadReport()">
+            <option value="">Barchasi</option>
+            <option value="late">Faqat kechikkan</option>
+            <option value="ontime">Faqat vaqtida</option>
+            <option value="auto">Faqat avto-yopilgan (tugatmagan)</option>
+          </select>
+        </div>
+        <button class="btn btn-secondary btn-full" onclick="exportExcel()" style="margin-bottom:8px;">
+          📊 Excel yuklab olish (jadval)
         </button>
+        <button class="btn btn-secondary btn-full" onclick="exportExcelSessions()" style="margin-bottom:14px;">
+          📋 Excel: ish sessiyalari (Keldi–Ketdi)
+        </button>
+        <div class="card" id="report-summary" style="display:none;margin-bottom:14px;"></div>
         <div class="card" id="report-chart-card" style="display:none;">
-          <div style="font-size:14px;font-weight:700;margin-bottom:14px;text-align:center;">Xodimlar bo'yicha davomat</div>
+          <div style="font-size:14px;font-weight:700;margin-bottom:14px;text-align:center;">Xodimlar bo'yicha kelishlar</div>
           <div style="display:flex;align-items:center;justify-content:center;gap:20px;flex-wrap:wrap;">
             <svg id="donut-chart" width="180" height="180" viewBox="0 0 180 180"></svg>
             <div id="donut-legend" style="display:flex;flex-direction:column;gap:8px;"></div>
@@ -837,6 +862,14 @@ body {
       <!-- LATE TAB -->
       <div id="att-late" class="hidden">
         <div id="late-list"></div>
+      </div>
+      <!-- ISSUES TAB (kelmagan / tugatmagan) -->
+      <div id="att-issues" class="hidden">
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;">
+          <span style="font-size:12px;color:var(--text2);font-weight:600;">📅 Sana:</span>
+          <input type="date" id="issues-date" onchange="renderIssues()" style="flex:1;padding:9px 12px;border-radius:12px;border:none;background:var(--inset-bg);color:var(--text);box-shadow:var(--shadow-in);font-family:'Manrope',sans-serif;font-size:13px;">
+        </div>
+        <div id="issues-list"></div>
       </div>
     </div>
   </div>
@@ -950,6 +983,10 @@ body {
             <span style="color:var(--accent);font-weight:700;">@xn_prgm</span>
           </div>
         </a>
+        <div class="settings-row">
+          <span style="display:flex;align-items:center;gap:10px;">🏷️ Tizim versiyasi</span>
+          <span id="app-version-label" style="color:var(--text2);font-weight:700;"></span>
+        </div>
       </div>
     </div>
   </div>
@@ -1262,6 +1299,7 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 // ============================================================
 // STATE
 // ============================================================
+const APP_VERSION = 'upg 11';
 let currentUser = null;
 let students = [], teachers = [], groups = [], staffList = [], branches = [], tasks = [], attendances = [], admins = [];
 let selectedStatus = null, selectedReason = null, selectedTeacher = null, selectedGroup = null;
@@ -1274,6 +1312,15 @@ function esc(s) {
   const d = document.createElement('div');
   d.textContent = String(s);
   return d.innerHTML;
+}
+
+// Daqiqani "S soat D daqiqa" formatiga o'giradi. 60 dan kichik bo'lsa faqat daqiqa.
+function fmtDuration(mins) {
+  const m = Math.abs(Math.round(mins));
+  if (m < 60) return m + ' daqiqa';
+  const h = Math.floor(m / 60);
+  const rem = m % 60;
+  return rem > 0 ? `${h} soat ${rem} daqiqa` : `${h} soat`;
 }
 
 // Custom tasdiqlash dialogi (brauzer confirm o'rniga) — Promise<boolean>
@@ -1627,7 +1674,18 @@ function setupUI() {
   applyLang();
 
   // Boshlang'ich sahifa
-  showPage(isStaff ? 'myattend' : 'students');
+  if (isStaff) {
+    // Xodim shu qurilmada birinchi marta ochsa — vazifalar oynasi ko'rsatiladi
+    const seenKey = 'firstOpen_' + currentUser.id;
+    if (!localStorage.getItem(seenKey)) {
+      localStorage.setItem(seenKey, '1');
+      showPage('tasks');
+    } else {
+      showPage('myattend');
+    }
+  } else {
+    showPage('students');
+  }
 }
 
 // ============================================================
@@ -1827,7 +1885,7 @@ function renderStudents() {
       const cls = days > 7 ? 'green' : days > 2 ? 'yellow' : 'red';
       freezeInfo = `<span class="freeze-days ${cls}" style="font-size:13px;">${days>0?days+' kun':'Tugadi'}</span>`;
     }
-    const addedDate = s.created_at ? new Date(s.created_at).toLocaleDateString('uz-UZ', {day:'numeric',month:'short',year:'numeric'}) : '';
+    const addedDate = s.created_at ? new Date(s.created_at).toLocaleDateString('uz-UZ', {day:'numeric',month:'short',year:'numeric'}) + ', ' + new Date(s.created_at).toLocaleTimeString('uz-UZ',{hour:'2-digit',minute:'2-digit'}) : '';
     const reasonTag = s.freeze_reason ? `<span style="font-size:10px;color:var(--text3);">• ${s.freeze_reason}</span>` : '';
     return `<div class="student-card" onclick="openStudentDetail('${s.id}')">
       <div class="student-avatar" style="background:${colors[s.status]};color:${textColors[s.status]}">${initials}</div>
@@ -1926,7 +1984,7 @@ function openStudentDetail(id) {
   document.getElementById('detail-avatar').style.color = textColors[s.status];
   document.getElementById('detail-avatar').textContent = initials;
   document.getElementById('detail-name').textContent = s.name;
-  const added = s.created_at ? new Date(s.created_at).toLocaleDateString('uz-UZ',{day:'numeric',month:'long',year:'numeric'}) : '';
+  const added = s.created_at ? new Date(s.created_at).toLocaleDateString('uz-UZ',{day:'numeric',month:'long',year:'numeric'}) + ', ' + new Date(s.created_at).toLocaleTimeString('uz-UZ',{hour:'2-digit',minute:'2-digit'}) : '';
   const parts = [];
   if (s.teacher) parts.push(s.teacher);
   if (s.group_name) parts.push(s.group_name);
@@ -2154,23 +2212,14 @@ function cancelLateReason() {
 
 // Motivatsion / tanbeh xabari (yuqorida kichik message)
 function motivationalMessage(type, lateMin, earlyMin) {
-  let msg, dur = 3500, kind = 'ok';
+  let msg, dur = 3000, kind = 'ok';
   if (type === 'checkin') {
-    if (lateMin > 0) {
-      kind = 'warn';
-      msg = `Bugun ish vaqtidan ${lateMin} daqiqa kech keldingiz. Davomatga qayd etildi.`;
-      dur = 4000;
-    } else if (earlyMin && earlyMin > 0) {
-      msg = `Ofarin! Ish vaqtidan ${earlyMin} daqiqa oldin keldingiz 👏 Barakali ish kuni bo'lsin!`;
-      dur = 4000;
-    } else {
-      const rahmat = [
-        `Xush kelibsiz! O'z vaqtida kelganingiz uchun rahmat 🌟`,
-        `Ajoyib! Bugun ham o'z vaqtidasiz. Samarali ish kuni tilaymiz ☀️`,
-        `Vaqtida keldingiz — barakali ish kuni bo'lsin! 💚`
-      ];
-      msg = rahmat[Math.floor(Math.random()*rahmat.length)];
-    }
+    const rahmat = [
+      `Xush kelibsiz! Davomat qayd etildi 🌟`,
+      `Keldingiz qayd etildi. Samarali ish kuni tilaymiz ☀️`,
+      `Xush kelibsiz — barakali ish kuni bo'lsin! 💚`
+    ];
+    msg = rahmat[Math.floor(Math.random()*rahmat.length)];
   } else {
     const yakun = [
       `Bugungi mehnatingiz uchun rahmat! Yaxshi dam oling 🙌`,
@@ -2330,7 +2379,7 @@ function renderMyToday() {
       <span style="font-weight:600;">${isIn ? '⬆ Keldim' : '⬇ Ketdim'}${r.branch_name?` <span style="color:var(--text2);font-weight:400;font-size:12px;">• ${r.branch_name}</span>`:''}</span>
       <span style="display:flex;gap:6px;align-items:center;">
         <span class="time-badge">${hm}</span>
-        ${autoClosed?`<span class="late-badge" title="Avtomatik yopilgan">⚠ Tugatmagan</span>`:(r.late_minutes>0?`<span class="late-badge">+${r.late_minutes} min</span>`:(isIn?`<span class="on-time-badge">Vaqtida</span>`:''))}
+        ${autoClosed?`<span class="late-badge" title="Avtomatik yopilgan">⚠ Tugatmagan</span>`:''}
       </span>
     </div>`;
   }).join('');
@@ -2568,23 +2617,13 @@ async function myCheck(type) {
     if (type === 'checkin') {
       const shifts = todayShiftsFor(dow);
       if (shifts.length) {
-        // 1) Kelgan vaqt qaysidir smena oynasiga (start-60min .. end) tushsa — o'sha smena.
-        // 2) Hech qaysiga tushmasa va oldinda smena bo'lsa — keyingi smenaga ERTA.
-        // 3) Hammasi o'tib ketgan bo'lsa — eng oxirgisiga nisbatan (kech).
-        let chosen = null;
-        // Oynaga tushadiganlar
+        // Xodim kelgan vaqtga BOSHLANISHI eng yaqin smenani tanlaymiz.
+        // (end/oyna hisobiga bog'liq emas — shuning uchun boshqa smena ta'sir qilmaydi)
+        // Masalan 16:37 -> 16:40 smena (3 daqiqa), 08:00 emas (517 daqiqa).
+        let chosen = shifts[0];
         shifts.forEach(sh => {
-          if (hm >= (sh.startMin - EARLY_LIMIT_MIN) && hm <= sh.endMin) {
-            if (chosen === null || Math.abs(hm - sh.startMin) < Math.abs(hm - chosen.startMin)) chosen = sh;
-          }
+          if (Math.abs(hm - sh.startMin) < Math.abs(hm - chosen.startMin)) chosen = sh;
         });
-        // Oynaga tushmasa — kelajakdagi eng yaqin smena (erta kelgan)
-        if (!chosen) {
-          let next = null;
-          shifts.forEach(sh => { if (sh.startMin > hm && (next === null || sh.startMin < next.startMin)) next = sh; });
-          if (next) chosen = next;
-          else chosen = shifts[shifts.length - 1]; // hammasi o'tib ketgan — oxirgisi
-        }
         const diff = hm - chosen.startMin; // + kech, - erta
         if (diff > 0) lateMin = diff;
         else if (diff < 0) earlyMin = -diff;
@@ -2639,12 +2678,132 @@ async function myCheck(type) {
 // ATTENDANCE (Admin)
 // ============================================================
 function switchAttTab(tab) {
-  ['checkin','report','late'].forEach(t => {
+  ['checkin','report','late','issues'].forEach(t => {
     document.getElementById('att-'+t).classList.toggle('hidden', t!==tab);
     document.getElementById('att-tab-'+t).classList.toggle('active', t===tab);
   });
   if (tab==='report') { populateReportBranch(); loadReport(); }
   if (tab==='late') loadLate();
+  if (tab==='issues') {
+    const di = document.getElementById('issues-date');
+    if (di && !di.value) di.value = uzNow().dateStr;
+    renderIssues();
+  }
+}
+
+// ============================================================
+// MUAMMOLI: kelmagan / tugatmagan (hisoblanadi)
+// ============================================================
+async function renderIssues() {
+  const box = document.getElementById('issues-list');
+  box.innerHTML = `<div style="text-align:center;padding:20px;color:var(--text2);">Hisoblanmoqda...</div>`;
+  const dateStr = document.getElementById('issues-date').value || uzNow().dateStr;
+
+  // O'sha kun uchun barcha davomat yozuvlari (Tashkent kun chegarasi)
+  const fromUtc = new Date(`${dateStr}T00:00:00+05:00`);
+  const toUtc = new Date(fromUtc.getTime() + 24*3600*1000);
+  const { data: recs } = await sb.from('attendance').select('*')
+    .gte('time', fromUtc.toISOString())
+    .lt('time', toUtc.toISOString())
+    .order('time', { ascending: true });
+  const records = recs || [];
+
+  // Tanlangan kunning hafta kuni (Tashkent) — uzParts orqali aniq
+  const dowLocal = uzParts(new Date(`${dateStr}T12:00:00+05:00`)).dow;
+
+  const notCome = [];   // kelmagan
+  const notClosed = []; // tugatmagan (checkin bor, checkout yo'q va smena+1soat o'tgan)
+  const nowMs = Date.now();
+
+  staffList.forEach(st => {
+    let shifts = st.shifts;
+    if (typeof shifts === 'string') { try { shifts = JSON.parse(shifts); } catch(_) { shifts = []; } }
+    if (!Array.isArray(shifts)) shifts = [];
+    // Shu kunga tegishli smenalar
+    const todayShifts = shifts.filter(sh => {
+      if (!sh || !sh.start) return false;
+      if (!sh.days || !sh.days.length) return true;
+      return sh.days.some(d => Number(d) === dowLocal);
+    });
+    if (!todayShifts.length) return; // bugun ish kuni emas — e'tiborsiz
+
+    const myRecs = records.filter(r => r.staff_id === st.id);
+    const hasCheckin = myRecs.some(r => r.type === 'checkin');
+
+    // Eng erta smena boshlanishi o'tганmi? (kelmagan deb belgilash uchun)
+    const earliestStart = Math.min(...todayShifts.map(sh => {
+      const [h,m] = sh.start.split(':').map(Number); return h*60+m;
+    }));
+    const nowLocal = uzNow();
+    const isToday = dateStr === nowLocal.dateStr;
+    const nowMin = nowLocal.hour*60 + nowLocal.minute;
+
+    // KELMAGAN: hech qanday checkin yo'q VA (o'tган kun bo'lsa, yoki bugun bo'lsa eng erta smena boshlangan bo'lsa)
+    if (!hasCheckin) {
+      if (!isToday || nowMin >= earliestStart) {
+        notCome.push({ name: st.name, branch: st.branch_name || '', shifts: todayShifts });
+      }
+      return;
+    }
+
+    // TUGATMAGAN: oxirgi yozuvi checkin (ochiq sessiya) va smena+1soat o'tган
+    const last = myRecs[myRecs.length - 1];
+    if (last && last.type === 'checkin') {
+      // Shu checkin qaysi smenага? — eng yaqin boshlanишли
+      const [ch] = [uzParts(new Date(last.time))];
+      const cMin = ch.hour*60 + ch.minute;
+      let near = todayShifts[0];
+      todayShifts.forEach(sh => {
+        const [h,m] = sh.start.split(':').map(Number);
+        const [nh,nm] = near.start.split(':').map(Number);
+        if (Math.abs(cMin-(h*60+m)) < Math.abs(cMin-(nh*60+nm))) near = sh;
+      });
+      let dur = 240;
+      if (near.end) {
+        const [sh_h,sh_m] = near.start.split(':').map(Number);
+        const [eh,em] = near.end.split(':').map(Number);
+        dur = (eh*60+em) - (sh_h*60+sh_m);
+        if (dur <= 0) dur += 1440;
+      }
+      const expectedOut = new Date(last.time).getTime() + dur*60000;
+      const deadline = expectedOut + 60*60000; // +1 soat
+      if (nowMs >= deadline) {
+        notClosed.push({ name: st.name, branch: last.branch_name || '', checkinTime: uzParts(new Date(last.time)) });
+      }
+    }
+  });
+
+  // Chizish
+  let html = '';
+  html += `<div class="card" style="margin-bottom:14px;">
+    <div style="font-weight:700;font-size:14px;margin-bottom:12px;display:flex;align-items:center;gap:8px;">
+      <span style="color:var(--red);">❌</span> Kelmaganlar <span style="color:var(--text3);font-weight:400;">(${notCome.length})</span>
+    </div>`;
+  if (notCome.length) {
+    html += notCome.map(x => `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid var(--glass-border);">
+      <span style="font-weight:600;">${esc(x.name)}</span>
+      <span style="font-size:12px;color:var(--text2);">${x.shifts.map(s=>s.start+(s.end?'–'+s.end:'')).join(', ')}</span>
+    </div>`).join('');
+  } else {
+    html += `<div style="font-size:13px;color:var(--text3);padding:6px 0;">Kelmaganlar yo'q ✓</div>`;
+  }
+  html += `</div>`;
+
+  html += `<div class="card">
+    <div style="font-weight:700;font-size:14px;margin-bottom:12px;display:flex;align-items:center;gap:8px;">
+      <span style="color:var(--yellow);">⚠️</span> Ketdim qilmaganlar <span style="color:var(--text3);font-weight:400;">(${notClosed.length})</span>
+    </div>`;
+  if (notClosed.length) {
+    html += notClosed.map(x => `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid var(--glass-border);">
+      <span style="font-weight:600;">${esc(x.name)}</span>
+      <span style="font-size:12px;color:var(--text2);">Keldi: ${String(x.checkinTime.hour).padStart(2,'0')}:${String(x.checkinTime.minute).padStart(2,'0')} • Ketdim yo'q</span>
+    </div>`).join('');
+  } else {
+    html += `<div style="font-size:13px;color:var(--text3);padding:6px 0;">Hammasi Ketdim qilgan ✓</div>`;
+  }
+  html += `</div>`;
+
+  box.innerHTML = html;
 }
 
 function openCheckIn() {
@@ -2700,7 +2859,7 @@ function renderTodayAttendance() {
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
           <span class="time-badge">${a.type==='checkin'?'⬆':'⬇'} ${hm}</span>
-          ${a.late_minutes>0?`<span class="late-badge">+${a.late_minutes} min kech</span>`:`<span class="on-time-badge">Vaqtida</span>`}
+          ${a.late_minutes>0?`<span class="late-badge">+${fmtDuration(a.late_minutes)} kech</span>`:`<span class="on-time-badge">Vaqtida</span>`}
         </div>
       </div>
     </div>`;
@@ -2719,7 +2878,7 @@ function renderLate(data) {
           <div style="font-weight:700;font-size:14px;">${a.staff_name}</div>
           <div style="font-size:12px;color:var(--text2);">${a.branch_name||''} • ${d.toLocaleDateString('uz')} ${d.toLocaleTimeString('uz',{hour:'2-digit',minute:'2-digit'})}</div>
         </div>
-        <span class="late-badge">+${a.late_minutes} min</span>
+        <span class="late-badge">+${fmtDuration(a.late_minutes)}</span>
       </div>
       ${(a.late_reason || a.late_comment) ? `<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--glass-border);">
         ${a.late_reason?`<span class="tag tag-yellow">${a.late_reason}</span>`:''}
@@ -2731,27 +2890,92 @@ function renderLate(data) {
 
 function setReportPeriod(p) {
   reportPeriod = p;
-  ['daily','weekly','monthly'].forEach(x => document.getElementById('rp-'+x).classList.toggle('active', x===p));
+  ['daily','weekly','monthly','custom'].forEach(x => document.getElementById('rp-'+x).classList.toggle('active', x===p));
+  const range = document.getElementById('report-date-range');
+  if (range) range.style.display = p === 'custom' ? 'flex' : 'none';
+  if (p === 'custom') {
+    // Default: shu oyning boshidan bugungacha
+    const now = uzNow();
+    const from = document.getElementById('report-from');
+    const to = document.getElementById('report-to');
+    if (from && !from.value) from.value = `${now.year}-${String(now.month).padStart(2,'0')}-01`;
+    if (to && !to.value) to.value = now.dateStr;
+  }
   loadReport();
 }
 
 function populateReportBranch() {
   const sel = document.getElementById('report-branch');
-  sel.innerHTML = '<option value="">Barcha filiallar</option>' + branches.map(b=>`<option value="${b.id}">${b.name}</option>`).join('');
+  if (sel) sel.innerHTML = '<option value="">Barcha filiallar</option>' + branches.map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join('');
+  const staffSel = document.getElementById('report-staff');
+  if (staffSel) staffSel.innerHTML = '<option value="">Barcha xodimlar</option>' + staffList.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('');
 }
 
 async function loadReport() {
   const branchId = document.getElementById('report-branch')?.value;
+  const staffId = document.getElementById('report-staff')?.value;
+  const statusFilter = document.getElementById('report-status')?.value || '';
   const now = new Date();
-  let from;
+  let from, to = null;
+
   if (reportPeriod === 'daily') { from = new Date(now.getFullYear(), now.getMonth(), now.getDate()); }
   else if (reportPeriod === 'weekly') { const d = now.getDay(); from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - d); }
-  else { from = new Date(now.getFullYear(), now.getMonth(), 1); }
+  else if (reportPeriod === 'monthly') { from = new Date(now.getFullYear(), now.getMonth(), 1); }
+  else if (reportPeriod === 'custom') {
+    const fv = document.getElementById('report-from')?.value;
+    const tv = document.getElementById('report-to')?.value;
+    from = fv ? new Date(`${fv}T00:00:00+05:00`) : new Date(now.getFullYear(), now.getMonth(), 1);
+    to = tv ? new Date(`${tv}T23:59:59+05:00`) : null;
+  }
+
   let query = sb.from('attendance').select('*').gte('time', from.toISOString()).order('time', { ascending: false });
+  if (to) query = query.lte('time', to.toISOString());
   if (branchId) query = query.eq('branch_id', branchId);
-  const { data } = await query;
-  renderReportTable(data || []);
-  renderDonutChart(data || []);
+  if (staffId) query = query.eq('staff_id', staffId);
+  let { data } = await query;
+  data = data || [];
+
+  // Holat filtri (client-side)
+  if (statusFilter === 'late') data = data.filter(r => r.type === 'checkin' && r.late_minutes > 0);
+  else if (statusFilter === 'ontime') data = data.filter(r => r.type === 'checkin' && !(r.late_minutes > 0));
+  else if (statusFilter === 'auto') data = data.filter(r => r.auto_closed);
+
+  renderReportSummary(data);
+  renderReportTable(data);
+  renderDonutChart(data);
+}
+
+// Hisobot xulosasi (umumiy sonlar)
+function renderReportSummary(data) {
+  const box = document.getElementById('report-summary');
+  if (!box) return;
+  const checkins = data.filter(r => r.type === 'checkin');
+  const lateCount = checkins.filter(r => r.late_minutes > 0).length;
+  const onTimeCount = checkins.length - lateCount;
+  const autoCount = data.filter(r => r.auto_closed).length;
+  const totalLateMin = checkins.reduce((s,r) => s + (r.late_minutes>0?r.late_minutes:0), 0);
+  if (!data.length) { box.style.display = 'none'; return; }
+  box.style.display = '';
+  box.innerHTML = `
+    <div style="font-weight:700;font-size:14px;margin-bottom:12px;">Xulosa</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div style="text-align:center;padding:10px;border-radius:12px;background:var(--inset-bg);box-shadow:var(--shadow-in);">
+        <div style="font-size:22px;font-weight:800;color:var(--green);">${onTimeCount}</div>
+        <div style="font-size:11px;color:var(--text2);">Vaqtida kelgan</div>
+      </div>
+      <div style="text-align:center;padding:10px;border-radius:12px;background:var(--inset-bg);box-shadow:var(--shadow-in);">
+        <div style="font-size:22px;font-weight:800;color:var(--red);">${lateCount}</div>
+        <div style="font-size:11px;color:var(--text2);">Kechikkan</div>
+      </div>
+      <div style="text-align:center;padding:10px;border-radius:12px;background:var(--inset-bg);box-shadow:var(--shadow-in);">
+        <div style="font-size:22px;font-weight:800;color:var(--yellow);">${autoCount}</div>
+        <div style="font-size:11px;color:var(--text2);">Tugatmagan (avto)</div>
+      </div>
+      <div style="text-align:center;padding:10px;border-radius:12px;background:var(--inset-bg);box-shadow:var(--shadow-in);">
+        <div style="font-size:16px;font-weight:800;color:var(--accent);">${fmtDuration(totalLateMin)}</div>
+        <div style="font-size:11px;color:var(--text2);">Jami kechikish</div>
+      </div>
+    </div>`;
 }
 
 // Animatik doirali (donut) diagramma — xodimlar bo'yicha kelishlar soni
@@ -2810,55 +3034,133 @@ function renderDonutChart(data) {
 
 function renderReportTable(data) {
   const el = document.getElementById('report-table');
-  if (!data.length) { el.innerHTML = `<div class="empty"><h3>${t('no_data')}</h3></div>`; return; }
+  if (!data.length) { el.innerHTML = `<div class="empty"><h3>${t('no_data')}</h3></div>`; _lastReportData = []; return; }
   el.innerHTML = `<div style="overflow-x:auto;">
     <table style="width:100%;border-collapse:collapse;font-size:13px;">
       <thead><tr style="color:var(--text2);">
         <th style="text-align:left;padding:8px 4px;border-bottom:1px solid var(--card-border);">Xodim</th>
-        <th style="text-align:left;padding:8px 4px;border-bottom:1px solid var(--card-border);">Filial</th>
-        <th style="text-align:left;padding:8px 4px;border-bottom:1px solid var(--card-border);">Tur</th>
+        <th style="text-align:left;padding:8px 4px;border-bottom:1px solid var(--card-border);">Sana</th>
         <th style="text-align:left;padding:8px 4px;border-bottom:1px solid var(--card-border);">Vaqt</th>
+        <th style="text-align:left;padding:8px 4px;border-bottom:1px solid var(--card-border);">Amal</th>
         <th style="text-align:right;padding:8px 4px;border-bottom:1px solid var(--card-border);">Kechikish</th>
-        <th style="text-align:left;padding:8px 4px;border-bottom:1px solid var(--card-border);">Sabab / Izoh</th>
+        <th style="text-align:left;padding:8px 4px;border-bottom:1px solid var(--card-border);">Sabab</th>
       </tr></thead>
       <tbody>${data.map(r=>{
-        const d = new Date(r.time);
+        const lp = uzParts(new Date(r.time));
+        const dateStr = `${String(lp.day).padStart(2,'0')}.${String(lp.month).padStart(2,'0')}.${lp.year}`;
+        const timeStr = `${String(lp.hour).padStart(2,'0')}:${String(lp.minute).padStart(2,'0')}`;
         const reasonCell = (r.late_reason || r.late_comment)
-          ? `${r.late_reason?`<span class="tag tag-yellow">${r.late_reason}</span>`:''}${r.late_comment?`<div style="font-size:11px;color:var(--text2);margin-top:2px;">${r.late_comment}</div>`:''}`
+          ? `${r.late_reason?`<span class="tag tag-yellow">${esc(r.late_reason)}</span>`:''}${r.late_comment?`<div style="font-size:11px;color:var(--text2);margin-top:2px;">${esc(r.late_comment)}</div>`:''}`
           : '';
         return `<tr>
-          <td style="padding:8px 4px;border-bottom:1px solid var(--card-border);">${r.staff_name||'-'}</td>
-          <td style="padding:8px 4px;border-bottom:1px solid var(--card-border);color:var(--text2);">${r.branch_name||'-'}</td>
-          <td style="padding:8px 4px;border-bottom:1px solid var(--card-border);">${r.type==='checkin'?'⬆ Keldi':'⬇ Ketdi'}${r.auto_closed?' <span style="color:var(--yellow);font-size:11px;">(avto)</span>':''}</td>
-          <td style="padding:8px 4px;border-bottom:1px solid var(--card-border);">${d.toLocaleDateString('uz')} ${d.toLocaleTimeString('uz',{hour:'2-digit',minute:'2-digit'})}</td>
-          <td style="padding:8px 4px;border-bottom:1px solid var(--card-border);text-align:right;">${r.late_minutes>0?`<span class="late-badge">+${r.late_minutes}min</span>`:''}</td>
+          <td style="padding:8px 4px;border-bottom:1px solid var(--card-border);font-weight:600;">${esc(r.staff_name||'-')}</td>
+          <td style="padding:8px 4px;border-bottom:1px solid var(--card-border);color:var(--text2);">${dateStr}</td>
+          <td style="padding:8px 4px;border-bottom:1px solid var(--card-border);font-weight:700;">${timeStr}</td>
+          <td style="padding:8px 4px;border-bottom:1px solid var(--card-border);">${r.type==='checkin'?'<span style="color:var(--green);">⬆ Keldi</span>':'<span style="color:var(--text2);">⬇ Ketdi</span>'}${r.auto_closed?' <span style="color:var(--yellow);font-size:11px;">(avto)</span>':''}</td>
+          <td style="padding:8px 4px;border-bottom:1px solid var(--card-border);text-align:right;">${r.late_minutes>0?`<span class="late-badge">${fmtDuration(r.late_minutes)}</span>`:''}</td>
           <td style="padding:8px 4px;border-bottom:1px solid var(--card-border);">${reasonCell}</td>
         </tr>`;
       }).join('')}</tbody>
     </table>
   </div>`;
-  // Excel uchun xom ma'lumotni saqlaymiz
   _lastReportData = data;
 }
 
 let _lastReportData = [];
 
+// Xom yozuvlarni ish sessiyalariga (Keldi–Ketdi juft) aylantirish
+function buildSessions(data) {
+  // Xodim bo'yicha, vaqt bo'yicha o'sish tartibida
+  const byStaff = {};
+  data.slice().sort((a,b) => new Date(a.time) - new Date(b.time)).forEach(r => {
+    (byStaff[r.staff_id] = byStaff[r.staff_id] || []).push(r);
+  });
+  const sessions = [];
+  Object.values(byStaff).forEach(recs => {
+    let open = null;
+    recs.forEach(r => {
+      if (r.type === 'checkin') {
+        if (open) sessions.push(makeSession(open, null)); // oldingi yopilmagan
+        open = r;
+      } else { // checkout
+        if (open) { sessions.push(makeSession(open, r)); open = null; }
+        else sessions.push(makeSession(null, r)); // keldimsiz ketdi
+      }
+    });
+    if (open) sessions.push(makeSession(open, null));
+  });
+  // Sana bo'yicha teskari (yangi birinchi)
+  sessions.sort((a,b) => b.sortTime - a.sortTime);
+  return sessions;
+}
+function makeSession(cin, cout) {
+  const ref = cin || cout;
+  const lp = uzParts(new Date(ref.time));
+  let durMin = null;
+  if (cin && cout) durMin = Math.round((new Date(cout.time) - new Date(cin.time)) / 60000);
+  return {
+    staff_name: ref.staff_name || '-',
+    branch_name: ref.branch_name || '-',
+    date: `${String(lp.day).padStart(2,'0')}.${String(lp.month).padStart(2,'0')}.${lp.year}`,
+    checkin: cin ? uzParts(new Date(cin.time)) : null,
+    checkout: cout ? uzParts(new Date(cout.time)) : null,
+    lateMin: cin && cin.late_minutes > 0 ? cin.late_minutes : 0,
+    lateReason: cin ? (cin.late_reason || '') : '',
+    autoClosed: cout ? cout.auto_closed : false,
+    durMin,
+    sortTime: new Date(ref.time).getTime()
+  };
+}
+function hhmm(p) { return p ? `${String(p.hour).padStart(2,'0')}:${String(p.minute).padStart(2,'0')}` : '—'; }
+
 function exportExcel() {
-  const rows = [['Xodim','Filial','Tur','Sana','Vaqt','Kechikish (min)','Sabab','Izoh']];
+  if (!_lastReportData.length) { showToast('Ma\'lumot yo\'q'); return; }
+  const rows = [['Xodim','Sana','Vaqt','Amal','Kechikish','Kechikish (daqiqa)','Sabab','Izoh','Filial']];
   _lastReportData.forEach(r => {
-    const d = new Date(r.time);
+    const lp = uzParts(new Date(r.time));
     rows.push([
-      r.staff_name||'', r.branch_name||'',
-      r.type==='checkin'?'Keldi':'Ketdi',
-      d.toLocaleDateString('uz'), d.toLocaleTimeString('uz',{hour:'2-digit',minute:'2-digit'}),
-      r.late_minutes>0?r.late_minutes:0,
-      r.late_reason||'', r.late_comment||''
+      r.staff_name||'',
+      `${String(lp.day).padStart(2,'0')}.${String(lp.month).padStart(2,'0')}.${lp.year}`,
+      `${String(lp.hour).padStart(2,'0')}:${String(lp.minute).padStart(2,'0')}`,
+      r.type==='checkin' ? (r.auto_closed?'Keldi':'Keldi') : (r.auto_closed?'Ketdi (avto)':'Ketdi'),
+      r.late_minutes>0 ? fmtDuration(r.late_minutes) : '',
+      r.late_minutes>0 ? r.late_minutes : 0,
+      r.late_reason||'', r.late_comment||'', r.branch_name||''
     ]);
   });
   const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [{wch:18},{wch:12},{wch:8},{wch:12},{wch:16},{wch:14},{wch:16},{wch:20},{wch:20}];
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Hisobot');
-  XLSX.writeFile(wb, `Hisobot_${new Date().toLocaleDateString('uz')}.xlsx`);
+  XLSX.utils.book_append_sheet(wb, ws, 'Davomat');
+  XLSX.writeFile(wb, `Davomat_${uzNow().dateStr}.xlsx`);
+}
+
+// Ish sessiyalari — Keldi–Ketdi juftlangan, ish soati bilan (o'qish oson)
+function exportExcelSessions() {
+  if (!_lastReportData.length) { showToast('Ma\'lumot yo\'q'); return; }
+  const sessions = buildSessions(_lastReportData);
+  const rows = [['Xodim','Sana','Keldi','Ketdi','Ish vaqti','Kechikish','Holat','Sabab','Filial']];
+  sessions.forEach(s => {
+    let holat = [];
+    if (s.lateMin > 0) holat.push(`${fmtDuration(s.lateMin)} kech`);
+    else if (s.checkin) holat.push('Vaqtida');
+    if (!s.checkout) holat.push('Ketdim yo\'q');
+    if (s.autoClosed) holat.push('Avto-yopilgan');
+    if (!s.checkin) holat.push('Keldimsiz');
+    rows.push([
+      s.staff_name, s.date,
+      hhmm(s.checkin), hhmm(s.checkout),
+      s.durMin != null ? fmtDuration(s.durMin) : '—',
+      s.lateMin > 0 ? fmtDuration(s.lateMin) : '',
+      holat.join(', '),
+      s.lateReason || '', s.branch_name
+    ]);
+  });
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [{wch:18},{wch:12},{wch:8},{wch:8},{wch:16},{wch:16},{wch:24},{wch:16},{wch:20}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Ish sessiyalari');
+  XLSX.writeFile(wb, `Ish_sessiyalari_${uzNow().dateStr}.xlsx`);
 }
 
 // ============================================================
@@ -3361,6 +3663,9 @@ document.querySelectorAll('.modal-overlay').forEach(ov => {
 window.addEventListener('DOMContentLoaded', () => {
   // Temani darhol qo'llash (login ekranida ham to'g'ri ko'rinsin)
   if (localStorage.getItem('theme') === 'dark') document.body.classList.add('dark');
+  // Tizim versiyasi
+  const vl = document.getElementById('app-version-label');
+  if (vl) vl.textContent = APP_VERSION;
   const saved = localStorage.getItem('session');
   if (saved) {
     try { currentUser = JSON.parse(saved); afterLogin(); }
