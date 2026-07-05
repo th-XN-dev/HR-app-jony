@@ -2231,7 +2231,7 @@
     // ============================================================
     // STATE
     // ============================================================
-    const APP_VERSION = 'upg 13';
+    const APP_VERSION = 'upg 14';
     let currentUser = null;
     let students = [], teachers = [], groups = [], staffList = [], branches = [], tasks = [], attendances = [], admins = [];
     let selectedStatus = null, selectedReason = null, selectedTeacher = null, selectedGroup = null;
@@ -4612,7 +4612,31 @@
 
       // Service worker ro'yxatdan o'tkazish (PWA install + push uchun shart)
       if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('./sw.js').catch(err => console.warn('SW:', err));
+        navigator.serviceWorker.register('./sw.js').then(reg => {
+          // Har ochilganda yangi versiyani tekshirish
+          reg.update();
+          // Yangi versiya topilsa — darhol faollashtirish
+          reg.addEventListener('updatefound', () => {
+            const nw = reg.installing;
+            if (!nw) return;
+            nw.addEventListener('statechange', () => {
+              if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+                // Yangi versiya tayyor — eski keshni tashlab, yangilaymiz
+                nw.postMessage('skipWaiting');
+                showToast('Yangi versiya yuklanmoqda...', 2000, 'ok');
+                setTimeout(() => window.location.reload(), 800);
+              }
+            });
+          });
+        }).catch(err => console.warn('SW:', err));
+
+        // Controller o'zgarsa (yangi SW faollashsa) — bir marta reload
+        let refreshing = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (refreshing) return;
+          refreshing = true;
+          window.location.reload();
+        });
       }
       initInstallPrompt();
     });
