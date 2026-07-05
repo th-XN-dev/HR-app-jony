@@ -230,7 +230,7 @@ body {
 .student-sub { font-size: 12px; color: var(--text2); margin-top: 2px; }
 .status-badge {
   font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 20px;
-  white-space: nowrap; text-transform: uppercase; letter-spacing: 0.5px;
+  white-space: nowrap; text-transform: uppercase; letter-spacing: 0.5px; flex-shrink: 0;
 }
 
 /* STATUS COLORS — yumshoq pastel */
@@ -551,7 +551,12 @@ body {
   #students-list {
     display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
   }
-  #students-list .student-card { margin-bottom: 0; }
+  #students-list .student-card { margin-bottom: 0; min-width: 0; }
+  #students-list .student-card .student-info { min-width: 0; overflow: hidden; }
+  #students-list .student-card .student-name,
+  #students-list .student-card .student-sub {
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
   #students-list .empty { grid-column: 1 / -1; }
 
   /* Stats in a single row */
@@ -576,9 +581,9 @@ body {
   #page-myattend .page-content { max-width: 520px; }
 }
 
-@media (min-width: 1024px) {
+@media (min-width: 1280px) {
   #students-list { grid-template-columns: 1fr 1fr 1fr; }
-  .page-content { max-width: 860px; }
+  #page-students .page-content { max-width: 1120px; }
 }
 
 @keyframes popIn {
@@ -1299,7 +1304,7 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 // ============================================================
 // STATE
 // ============================================================
-const APP_VERSION = 'upg 11';
+const APP_VERSION = 'upg 12';
 let currentUser = null;
 let students = [], teachers = [], groups = [], staffList = [], branches = [], tasks = [], attendances = [], admins = [];
 let selectedStatus = null, selectedReason = null, selectedTeacher = null, selectedGroup = null;
@@ -1888,13 +1893,13 @@ function renderStudents() {
     const addedDate = s.created_at ? new Date(s.created_at).toLocaleDateString('uz-UZ', {day:'numeric',month:'short',year:'numeric'}) + ', ' + new Date(s.created_at).toLocaleTimeString('uz-UZ',{hour:'2-digit',minute:'2-digit'}) : '';
     const reasonTag = s.freeze_reason ? `<span style="font-size:10px;color:var(--text3);">• ${s.freeze_reason}</span>` : '';
     return `<div class="student-card" onclick="openStudentDetail('${s.id}')">
-      <div class="student-avatar" style="background:${colors[s.status]};color:${textColors[s.status]}">${initials}</div>
+      <div class="student-avatar" style="background:${colors[s.status]};color:${textColors[s.status]};flex-shrink:0;">${initials}</div>
       <div class="student-info">
-        <div class="student-name">${s.name}</div>
-        <div class="student-sub">${s.teacher||''} ${s.group_name?'• '+s.group_name:''}</div>
+        <div class="student-name">${esc(s.name)}</div>
+        <div class="student-sub">${esc(s.teacher||'')} ${s.group_name?'• '+esc(s.group_name):''}</div>
         <div style="font-size:11px;color:var(--text3);margin-top:2px;">📅 ${addedDate} ${reasonTag}</div>
       </div>
-      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;">
         <span class="status-badge s-${s.status}">${t(s.status)}</span>
         ${freezeInfo}
       </div>
