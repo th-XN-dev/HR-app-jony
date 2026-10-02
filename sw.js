@@ -1,6 +1,6 @@
 // JONY KIDS Service Worker — network-first (yangilanish darhol ko'rinadi)
-const CACHE = 'jony-kids-v4';
-const ASSETS = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
+const CACHE = 'jony-kids-v9';
+const ASSETS = ['./', './index.html', './app.js', './styles.css', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).catch(() => {}));
@@ -23,21 +23,24 @@ self.addEventListener('fetch', e => {
   const url = e.request.url;
   if (!url.startsWith('http')) return;
 
-  // Supabase / API — har doim tarmoqdan, keshlanmaydi
-  if (url.includes('supabase') || url.includes('/rest/') || url.includes('/auth/') || url.includes('/storage/')) {
+  // Supabase / API — har doim tarmoqdan, keshlanmaydi (ma'lumot va tokenlar keshga tushmasin)
+  if (url.includes('supabase.co') || url.includes('/rest/') || url.includes('/auth/') || url.includes('/storage/') || url.includes('/functions/')) {
     return; // brauzer o'zi hal qiladi
   }
   if (e.request.method !== 'GET') return;
 
   // HTML va asosiy fayllar — NETWORK-FIRST (avval yangi versiya, kesh faqat zaxira)
   const isHTML = e.request.mode === 'navigate' || url.endsWith('.html') || url.endsWith('/');
-  const isCore = url.includes('index.html') || url.includes('sw.js') || url.includes('manifest.json');
+  const path = new URL(url).pathname;
+  const isCore = /\/(index\.html|sw\.js|manifest\.json|app\.js|styles\.css)$/.test(path);
 
   if (isHTML || isCore) {
     e.respondWith(
       fetch(e.request).then(res => {
-        const clone = res.clone();
-        caches.open(CACHE).then(c => c.put(e.request, clone));
+        if (res && res.ok) {
+          const clone = res.clone();
+          caches.open(CACHE).then(c => c.put(e.request, clone));
+        }
         return res;
       }).catch(() => caches.match(e.request).then(r => r || caches.match('./index.html')))
     );
