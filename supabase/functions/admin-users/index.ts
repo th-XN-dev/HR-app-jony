@@ -42,7 +42,7 @@ const PERMISSION_KEYS = [
   "attendance", "attendance_edit", "reports",
   "tasks_view", "tasks_manage",
   "staff_view", "staff_manage", "branches",
-  "penalty_settings", "staff_freeze", "penalty_cancel",
+  "penalty_settings", "staff_freeze", "penalty_cancel", "attendance_permit",
 ];
 const str = (v: unknown, max = 200) => (typeof v === "string" ? v.trim().slice(0, max) : "");
 

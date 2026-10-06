@@ -32,7 +32,8 @@ const PERMISSIONS = [
   { group: '📅 Davomat', items: [
     ['attendance', 'Davomatni ko\'rish (bugungi, kechikkanlar, muammoli)'],
     ['attendance_edit', 'Davomatni qo\'lda belgilash'],
-    ['reports', 'Hisobot va Excel eksport']] },
+    ['reports', 'Hisobot va Excel eksport'],
+    ['attendance_permit', 'Kechikishga ruxsat berish (ish boshlanishini surish)']] },
   { group: '📋 Vazifalar', items: [
     ['tasks_view', 'Vazifa va bildirishnomalarni ko\'rish'],
     ['tasks_manage', 'Vazifa yaratish / tahrirlash / o\'chirish']] },
@@ -86,6 +87,14 @@ const SERVER_ERRORS = {
   ALREADY_CANCELLED: 'Bu jarima allaqachon bekor qilingan.',
   FROZEN: 'Profilingiz muzlatilgan. Rahbariyatga murojaat qiling.',
   BAD_LIMIT: 'Chegara noto\'g\'ri.',
+  NEED_COMMENT: 'Izoh yozish majburiy.',
+  BAD_TIME: 'Vaqtni to\'g\'ri kiriting (SS:DD).',
+  PAST_DATE: 'O\'tgan kunga ruxsat berib bo\'lmaydi.',
+  NO_SHIFT_DAY: 'Bu kunga xodimga smena belgilanmagan.',
+  TIME_OUT_OF_SHIFT: 'Ruxsat vaqti smena boshlanishidan keyin va tugashidan oldin bo\'lishi kerak.',
+  ALREADY_CHECKED_IN: 'Xodim bu kuni allaqachon "Keldim" qilgan. Jarimani bekor qilish orqali hal qiling.',
+  PERMIT_USED: 'Ruxsat allaqachon ishlatilgan (xodim kelgan) — bekor qilib bo\'lmaydi.',
+  NO_STAFF: 'Xodim topilmadi.',
   FORBIDDEN: 'Bu amal uchun ruxsat yo\'q.',
   BAD_NAME: 'Ism noto\'g\'ri.',
   NOT_FOUND: 'Ma\'lumot topilmadi (o\'chirilgan bo\'lishi mumkin).',
@@ -145,7 +154,7 @@ function initialsOf(name) { return String(name || '?').split(' ').filter(Boolean
 // ============================================================
 // STATE
 // ============================================================
-const APP_VERSION = 'upg 19';
+const APP_VERSION = 'upg 21';
 let currentUser = null;
 let staffList = [], branches = [], tasks = [], attendances = [], admins = [];
 let penaltySettings = null;
@@ -544,7 +553,7 @@ function updateProfileDisplay() {
 // Bo'lim (sahifa) ruxsatlari
 const PAGE_ACCESS = {
   dashboard: () => canAny('dashboard', 'dashboard_late', 'dashboard_absent', 'dashboard_penalties'),
-  attendance: () => canAny('attendance', 'attendance_edit', 'reports'),
+  attendance: () => canAny('attendance', 'attendance_edit', 'reports', 'attendance_permit'),
   tasks: () => !isAdminUser() || canAny('tasks_view', 'tasks_manage'),
   admin: () => isSuper() || canAny('staff_view', 'staff_manage', 'branches', 'penalty_settings', 'staff_freeze'),
   myattend: () => !isAdminUser(),
@@ -567,6 +576,7 @@ function setupUI(keepPage) {
   show('att-tab-report', can('reports'));
   show('att-tab-late', can('attendance'));
   show('att-tab-issues', can('attendance'));
+  show('att-tab-permits', can('attendance_permit'));
   show('btn-add-staff', can('staff_manage'));
   show('adm-tab-staff', canAny('staff_view', 'staff_manage'));
   show('adm-tab-branches', can('branches'));
@@ -632,7 +642,7 @@ function showPage(page) {
 function refreshAttendancePage() {
   const curTab = document.querySelector('#page-attendance .tab.active');
   const curId = curTab ? curTab.id.replace('att-tab-', '') : null;
-  const firstTab = ['checkin', 'report', 'late', 'issues'].find(tb => document.getElementById('att-tab-' + tb).style.display !== 'none');
+  const firstTab = ['checkin', 'report', 'late', 'issues', 'permits'].find(tb => document.getElementById('att-tab-' + tb).style.display !== 'none');
   if (firstTab) switchAttTab(curId && curTab.style.display !== 'none' ? curId : firstTab);
 }
 
@@ -1028,6 +1038,16 @@ async function refreshMyAttendance() {
     .order('time', { ascending: true }));
   myTodayRecords = data || [];
   renderMyToday();
+  // Bugungi ruxsat (ish boshlanishi surilgan bo'lsa) — xodimga ko'rsatiladi
+  const pb = document.getElementById('my-permit-banner');
+  try {
+    const pm = must(await sb.from('attendance_permits').select('allowed_until, comment')
+      .eq('staff_id', currentUser.id).eq('permit_date', n.dateStr).eq('cancelled', false).maybeSingle());
+    if (pm && pb) {
+      pb.textContent = `🕘 Bugun sizga ${String(pm.allowed_until).slice(0, 5)} gacha kelishga ruxsat berilgan. Izoh: ${pm.comment}`;
+      pb.style.display = '';
+    } else if (pb) pb.style.display = 'none';
+  } catch (e) { if (pb) pb.style.display = 'none'; }
 }
 
 function renderMyToday() {
@@ -1114,9 +1134,25 @@ function infoModal(title, text, icon) {
   openModal('modal-info');
 }
 
-const EARLY_LIMIT_MIN = 60; // smenadan necha daqiqa oldin kelishga ruxsat
 
 // Bugun qaysi smenalar bor (ish kunlari bo'yicha), boshlanish vaqti bilan tartiblangan
+// Kelgan vaqtga tegishli smenani tanlash — serverdagi pick_shift() bilan BIR XIL qoida:
+//   1) davom etayotgan smena (bir nechta bo'lsa eng kech boshlangani);
+//   2) bo'lmasa — hali boshlanmagan eng yaqin smena (erta keldi);
+//   3) bo'lmasa — eng kech tugagan smena (hammasi tugagandan keyin keldi).
+// list elementlari: { startMin, endMin } (endMin yo'q bo'lsa oyna 4 soat)
+function pickShiftAt(list, hm) {
+  let inProg = null, upcoming = null, last = null;
+  list.forEach(sh => {
+    let end = sh.endMin != null ? sh.endMin : sh.startMin + 240;
+    if (end <= sh.startMin) end += 1440; // yarim tundan o'tadigan smena
+    if (hm >= sh.startMin && hm < end) { if (!inProg || sh.startMin > inProg.startMin) inProg = sh; }
+    else if (hm < sh.startMin) { if (!upcoming || sh.startMin < upcoming.startMin) upcoming = sh; }
+    else if (!last || end > last._end) { last = Object.assign({}, sh, { _end: end }); }
+  });
+  return inProg || upcoming || last;
+}
+
 function todayShiftsFor(dow) {
   let shifts = currentUser.shifts;
   if (typeof shifts === 'string') { try { shifts = JSON.parse(shifts); } catch (_) { shifts = []; } }
@@ -1133,27 +1169,6 @@ function todayShiftsFor(dow) {
   });
   list.sort((a, b) => a.startMin - b.startMin);
   return list;
-}
-
-// Keldim uchun smenalarni tahlil qilish.
-// Qaytaradi: { tooEarly, nearestStart, candidates:[{shift, lateMin, earlyMin}] }
-function analyzeCheckinShifts(hm, dow) {
-  const shifts = todayShiftsFor(dow);
-  if (!shifts.length) return { noShifts: true, candidates: [] };
-  // Mos smenalar: kelish vaqti [start - 60min] dan [end] gacha bo'lганлар
-  const candidates = [];
-  let nearestStart = null;
-  shifts.forEach(sh => {
-    const fromOk = hm >= (sh.startMin - EARLY_LIMIT_MIN);
-    const toOk = hm <= sh.endMin;
-    if (fromOk && toOk) {
-      const diff = hm - sh.startMin; // + kech, - erta
-      candidates.push({ shift: sh, lateMin: diff > 0 ? diff : 0, earlyMin: diff < 0 ? -diff : 0 });
-    }
-    // Eng yaqin kelajakdagi smena (juda erta xabari uchun)
-    if (sh.startMin > hm && (nearestStart === null || sh.startMin < nearestStart)) nearestStart = sh.startMin;
-  });
-  return { candidates, nearestStart, shifts };
 }
 
 function minToHHMM(min) {
@@ -1253,13 +1268,8 @@ async function myCheck(type) {
     if (type === 'checkin') {
       const shifts = todayShiftsFor(dow);
       if (shifts.length) {
-        // Xodim kelgan vaqtga BOSHLANISHI eng yaqin smenani tanlaymiz.
-        // (end/oyna hisobiga bog'liq emas — shuning uchun boshqa smena ta'sir qilmaydi)
-        // Masalan 16:37 -> 16:40 smena (3 daqiqa), 08:00 emas (517 daqiqa).
-        let chosen = shifts[0];
-        shifts.forEach(sh => {
-          if (Math.abs(hm - sh.startMin) < Math.abs(hm - chosen.startMin)) chosen = sh;
-        });
+        // Davom etayotgan smena bo'yicha hisoblanadi (yakuniy hisob serverda — staff_check)
+        const chosen = pickShiftAt(shifts, hm);
         const diff = hm - chosen.startMin; // + kech, - erta
         if (diff > 0) lateMin = diff;
         else if (diff < 0) earlyMin = -diff;
@@ -1302,13 +1312,14 @@ async function myCheck(type) {
 // ATTENDANCE (Admin)
 // ============================================================
 function switchAttTab(tab) {
-  ['checkin', 'report', 'late', 'issues'].forEach(t => {
+  ['checkin', 'report', 'late', 'issues', 'permits'].forEach(t => {
     document.getElementById('att-' + t).classList.toggle('hidden', t !== tab);
     document.getElementById('att-tab-' + t).classList.toggle('active', t === tab);
   });
   if (tab === 'checkin') loadAttendance().catch(e => showToast(errMsg(e), 4000));
   if (tab === 'report') { populateReportBranch(); loadReport(); }
   if (tab === 'late') loadLate().catch(e => showToast(errMsg(e), 4000));
+  if (tab === 'permits') renderPermits();
   if (tab === 'issues') {
     const di = document.getElementById('issues-date');
     if (di && !di.value) di.value = uzNow().dateStr;
@@ -1370,10 +1381,9 @@ function computeIssues(dateStr, records) {
     if (last.type !== 'checkin') return;
     const lp = uzParts(new Date(last.time));
     const cMin = lp.hour * 60 + lp.minute;
-    let near = todayShifts[0];
-    todayShifts.forEach(sh => { if (Math.abs(cMin - toMin(sh.start)) < Math.abs(cMin - toMin(near.start))) near = sh; });
+    const near = pickShiftAt(todayShifts.map(sh => ({ start: sh.start, end: sh.end, startMin: toMin(sh.start), endMin: sh.end ? toMin(sh.end) : null })), cMin);
     let dur = 240;
-    if (near.end) { dur = toMin(near.end) - toMin(near.start); if (dur <= 0) dur += 1440; }
+    if (near.end) { dur = near.endMin - near.startMin; if (dur <= 0) dur += 1440; }
     const deadline = new Date(last.time).getTime() + (dur + 60) * 60000;
     if (nowMs >= deadline) notClosed.push({ name: st.name, branch: last.branch_name || '', checkinTime: lp });
   });
@@ -1577,6 +1587,91 @@ function penaltyRowHtml(p) {
 }
 
 // ============================================================
+// KECHIKISHGA RUXSAT ("attendance_permit" ruxsati)
+// ============================================================
+const DOW_UZ = ['Yakshanba', 'Dushanba', 'Seshanba', 'Chorshanba', 'Payshanba', 'Juma', 'Shanba'];
+
+async function renderPermits() {
+  const box = document.getElementById('permits-list');
+  box.innerHTML = `<div style="text-align:center;padding:20px;color:var(--text2);">Yuklanmoqda...</div>`;
+  const from = new Date(tashkentDayStart(uzNow().dateStr).getTime() - 7 * 864e5);
+  let list = [];
+  try {
+    list = must(await sb.from('attendance_permits').select('*')
+      .gte('permit_date', uzParts(from).dateStr)
+      .order('permit_date', { ascending: false }).order('created_at', { ascending: false })) || [];
+  } catch (e) { box.innerHTML = ''; showToast(errMsg(e), 4000); return; }
+  const today = uzNow().dateStr;
+  box.innerHTML = list.length ? list.map(pm => {
+    const d = String(pm.permit_date);
+    const [y, m, dd] = d.split('-');
+    const canCancel = !pm.cancelled && d >= today;
+    return `<div class="card" style="display:flex;align-items:center;gap:12px;${pm.cancelled ? 'opacity:0.55;' : ''}">
+<div style="flex:1;min-width:0;">
+  <div style="font-weight:700;font-size:14px;${pm.cancelled ? 'text-decoration:line-through;' : ''}">${esc(pm.staff_name || '-')}</div>
+  <div style="font-size:12px;color:var(--text2);">📅 ${dd}.${m}.${y} • 🕘 ${esc(String(pm.allowed_until).slice(0, 5))} gacha</div>
+  <div style="font-size:12px;color:var(--text2);">📝 ${esc(pm.comment)}</div>
+  <div style="font-size:11px;color:var(--text3);">👤 ${esc(pm.created_by || '')}${pm.cancelled ? ` • ❌ bekor qilingan (${esc(pm.cancelled_by || '')})` : ''}</div>
+</div>
+${canCancel ? `<button class="btn btn-sm btn-danger" onclick="cancelPermit('${esc(pm.id)}')">Bekor</button>` : ''}
+</div>`;
+  }).join('') : `<div class="empty"><div class="empty-icon">🕘</div><h3>Ruxsatlar yo'q</h3></div>`;
+}
+
+function openPermitModal() {
+  const sel = document.getElementById('pm-staff');
+  sel.innerHTML = '<option value="">Xodimni tanlang</option>' + staffList.filter(s => !s.frozen)
+    .map(s => `<option value="${esc(s.id)}">${esc(s.name)}</option>`).join('');
+  document.getElementById('pm-date').value = uzNow().dateStr;
+  document.getElementById('pm-date').min = uzNow().dateStr;
+  document.getElementById('pm-until').value = '';
+  document.getElementById('pm-comment').value = '';
+  updatePermitHint();
+  openModal('modal-permit');
+}
+
+// Tanlangan kun uchun xodim smenasi va ruxsat natijasini ko'rsatish
+function updatePermitHint() {
+  const hint = document.getElementById('pm-hint');
+  const st = staffList.find(s => s.id === document.getElementById('pm-staff').value);
+  const date = document.getElementById('pm-date').value;
+  if (!st || !date) { hint.textContent = ''; return; }
+  const dow = uzParts(new Date(`${date}T12:00:00+05:00`)).dow;
+  const shifts = parseShifts(st.shifts).filter(sh => sh && sh.start && (!sh.days || !sh.days.length || sh.days.some(d => Number(d) === dow)));
+  if (!shifts.length) { hint.innerHTML = `<span style="color:var(--red);">⚠ ${DOW_UZ[dow]} kuni bu xodimga smena belgilanmagan.</span>`; return; }
+  const until = document.getElementById('pm-until').value;
+  hint.textContent = `${DOW_UZ[dow]} kungi smena: ${shifts.map(s => s.start + (s.end ? '–' + s.end : '')).join(', ')}`
+    + (until ? ` → ${until} gacha kelsa, kechikish hisoblanmaydi.` : '');
+}
+
+async function savePermit(btn) {
+  const staffId = document.getElementById('pm-staff').value;
+  const date = document.getElementById('pm-date').value;
+  const until = document.getElementById('pm-until').value;
+  const comment = document.getElementById('pm-comment').value.trim();
+  if (!staffId || !date || !until) { showToast('Xodim, kun va vaqtni tanlang'); return; }
+  if (!comment) { showToast(SERVER_ERRORS.NEED_COMMENT); document.getElementById('pm-comment').focus(); return; }
+  const restore = btnLoading(btn);
+  let res = null;
+  const ok = await run(t('save') + '...', async () => {
+    res = must(await sb.rpc('grant_permit', { p_staff: staffId, p_date: date, p_until: until.slice(0, 5), p_comment: comment }));
+  });
+  restore();
+  if (!ok) return;
+  closeModal('modal-permit');
+  showToast(`✓ ${res.staff_name}: ${res.until} gacha ruxsat berildi${res.replaced ? ' (avvalgisi almashtirildi)' : ''}`, 3000, 'ok');
+  renderPermits();
+}
+
+async function cancelPermit(id) {
+  if (!await confirmDialog('Ruxsat bekor qilinsinmi?', 'Xodimning ish vaqti odatdagidek hisoblanadi. Xodimga xabar yuboriladi.')) return;
+  const ok = await run(t('save') + '...', async () => { must(await sb.rpc('cancel_permit', { p_id: id })); });
+  if (!ok) return;
+  showToast('Ruxsat bekor qilindi', 1800, 'ok');
+  renderPermits();
+}
+
+// ============================================================
 // JARIMANI BEKOR QILISH ("penalty_cancel" ruxsati)
 // ============================================================
 let _cancelPenalty = null;
@@ -1629,6 +1724,7 @@ function showPenaltyNotice(p) {
 
 function openCheckIn() {
   document.getElementById('ci-time').value = toTashkentInput(new Date());
+  document.getElementById('ci-comment').value = '';
   selectedCIType = 'checkin';
   document.querySelectorAll('#modal-checkin .pill-entity').forEach((p, i) => p.classList.toggle('selected', i === 0));
   openModal('modal-checkin');
@@ -1639,7 +1735,9 @@ async function saveCheckIn() {
   const staffId = document.getElementById('ci-staff').value;
   const branchId = document.getElementById('ci-branch').value;
   const time = document.getElementById('ci-time').value;
+  const comment = document.getElementById('ci-comment').value.trim();
   if (!staffId || !time) { showToast('Ma\'lumot to\'ldiring!'); return; }
+  if (!comment) { showToast('Izoh yozish majburiy: nega qo\'lda belgilanmoqda?', 3000); document.getElementById('ci-comment').focus(); return; }
   // Kechikish serverda xodim "Keldim" qilgandagi qoida bilan bir xil hisoblanadi
   let result = null;
   const ok = await run(t('save') + '...', async () => {
@@ -1647,7 +1745,8 @@ async function saveCheckIn() {
       p_staff_id: staffId,
       p_branch_id: branchId || null,
       p_type: selectedCIType,
-      p_time: tashkentInputToISO(time)
+      p_time: tashkentInputToISO(time),
+      p_comment: comment
     }));
     await loadAttendance();
   });
@@ -1659,6 +1758,24 @@ async function saveCheckIn() {
     showToast(result && result.penalty ? `${t('saved')} · ${result.penalty.title}` : t('saved'), result && result.penalty ? 4500 : 2000);
   }
   closeModal('modal-checkin');
+}
+
+// Kelish holati belgisi: kechikkan / smena belgilanmagan / vaqtida (Ketdi yozuvlariga belgi qo'yilmaydi)
+function attendanceBadge(a) {
+  return attendanceStatusBadge(a) + attendanceNotes(a);
+}
+// Qo'lda belgilangan / ruxsat bilan kelgan yozuvlar uchun izoh
+function attendanceNotes(a) {
+  let html = '';
+  if (a.permit_until) html += `<div style="font-size:11px;color:var(--accent);margin-top:2px;" title="${esc(a.permit_comment || '')}">🕘 Ruxsat: ${esc(a.permit_until)} gacha</div>`;
+  if (a.manual) html += `<div style="font-size:11px;color:var(--text2);margin-top:2px;max-width:220px;text-align:right;">✍️ ${esc(a.manual_by || '')}: ${esc(a.manual_comment || '')}</div>`;
+  return html;
+}
+function attendanceStatusBadge(a) {
+  if (a.type !== 'checkin') return a.auto_closed ? `<span class="late-badge" title="Avtomatik yopilgan">avto</span>` : '';
+  if (a.late_minutes > 0) return `<span class="late-badge">+${fmtDuration(a.late_minutes)} kech</span>`;
+  if (a.no_shift) return `<span class="late-badge" style="background:rgba(224,162,60,0.18);color:var(--yellow);" title="Bu kunga xodimga smena belgilanmagan — kechikishni hisoblab bo'lmaydi">Smena yo'q</span>`;
+  return `<span class="on-time-badge">Vaqtida</span>`;
 }
 
 function renderTodayAttendance() {
@@ -1674,7 +1791,7 @@ function renderTodayAttendance() {
     </div>
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
       <span class="time-badge">${a.type === 'checkin' ? '⬆' : '⬇'} ${hm}</span>
-      ${a.late_minutes > 0 ? `<span class="late-badge">+${fmtDuration(a.late_minutes)} kech</span>` : `<span class="on-time-badge">Vaqtida</span>`}
+      ${attendanceBadge(a)}
     </div>
   </div>
 </div>`;
@@ -1762,7 +1879,7 @@ async function loadReport() {
 
   // Holat filtri (client-side)
   if (statusFilter === 'late') data = data.filter(r => r.type === 'checkin' && r.late_minutes > 0);
-  else if (statusFilter === 'ontime') data = data.filter(r => r.type === 'checkin' && !(r.late_minutes > 0));
+  else if (statusFilter === 'ontime') data = data.filter(r => r.type === 'checkin' && !(r.late_minutes > 0) && !r.no_shift);
   else if (statusFilter === 'auto') data = data.filter(r => r.auto_closed);
 
   renderReportSummary(data);
@@ -1776,7 +1893,7 @@ function renderReportSummary(data) {
   if (!box) return;
   const checkins = data.filter(r => r.type === 'checkin');
   const lateCount = checkins.filter(r => r.late_minutes > 0).length;
-  const onTimeCount = checkins.length - lateCount;
+  const onTimeCount = checkins.filter(r => !(r.late_minutes > 0) && !r.no_shift).length;
   const autoCount = data.filter(r => r.auto_closed).length;
   const totalLateMin = checkins.reduce((s, r) => s + (r.late_minutes > 0 ? r.late_minutes : 0), 0);
   if (!data.length) { box.style.display = 'none'; return; }
@@ -1874,15 +1991,16 @@ function renderReportTable(data) {
     const lp = uzParts(new Date(r.time));
     const dateStr = `${String(lp.day).padStart(2, '0')}.${String(lp.month).padStart(2, '0')}.${lp.year}`;
     const timeStr = `${String(lp.hour).padStart(2, '0')}:${String(lp.minute).padStart(2, '0')}`;
-    const reasonCell = (r.late_reason || r.late_comment)
-      ? `${r.late_reason ? `<span class="tag tag-yellow">${esc(r.late_reason)}</span>` : ''}${r.late_comment ? `<div style="font-size:11px;color:var(--text2);margin-top:2px;">${esc(r.late_comment)}</div>` : ''}`
-      : '';
+    const reasonCell = (r.late_reason ? `<span class="tag tag-yellow">${esc(r.late_reason)}</span>` : '')
+      + (r.late_comment ? `<div style="font-size:11px;color:var(--text2);margin-top:2px;">${esc(r.late_comment)}</div>` : '')
+      + (r.permit_until ? `<div style="font-size:11px;color:var(--accent);margin-top:2px;">🕘 Ruxsat ${esc(r.permit_until)} gacha: ${esc(r.permit_comment || '')}</div>` : '')
+      + (r.manual ? `<div style="font-size:11px;color:var(--text2);margin-top:2px;">✍️ Qo'lda (${esc(r.manual_by || '')}): ${esc(r.manual_comment || '')}</div>` : '');
     return `<tr>
       <td style="padding:8px 4px;border-bottom:1px solid var(--card-border);font-weight:600;">${esc(r.staff_name || '-')}</td>
       <td style="padding:8px 4px;border-bottom:1px solid var(--card-border);color:var(--text2);">${dateStr}</td>
       <td style="padding:8px 4px;border-bottom:1px solid var(--card-border);font-weight:700;">${timeStr}</td>
       <td style="padding:8px 4px;border-bottom:1px solid var(--card-border);">${r.type === 'checkin' ? '<span style="color:var(--green);">⬆ Keldi</span>' : '<span style="color:var(--text2);">⬇ Ketdi</span>'}${r.auto_closed ? ' <span style="color:var(--yellow);font-size:11px;">(avto)</span>' : ''}</td>
-      <td style="padding:8px 4px;border-bottom:1px solid var(--card-border);text-align:right;">${r.late_minutes > 0 ? `<span class="late-badge">${fmtDuration(r.late_minutes)}</span>` : ''}</td>
+      <td style="padding:8px 4px;border-bottom:1px solid var(--card-border);text-align:right;">${r.late_minutes > 0 ? `<span class="late-badge">${fmtDuration(r.late_minutes)}</span>` : (r.type === 'checkin' && r.no_shift ? `<span style="font-size:11px;color:var(--yellow);">Smena yo'q</span>` : '')}</td>
       <td style="padding:8px 4px;border-bottom:1px solid var(--card-border);">${reasonCell}</td>
     </tr>`;
   }).join('')}</tbody>
@@ -1930,6 +2048,7 @@ function makeSession(cin, cout) {
     checkin: cin ? uzParts(new Date(cin.time)) : null,
     checkout: cout ? uzParts(new Date(cout.time)) : null,
     lateMin: cin && cin.late_minutes > 0 ? cin.late_minutes : 0,
+    noShift: !!(cin && cin.no_shift),
     lateReason: cin ? (cin.late_reason || '') : '',
     autoClosed: cout ? cout.auto_closed : false,
     durMin,
@@ -1950,7 +2069,10 @@ function exportExcel() {
       r.type === 'checkin' ? (r.auto_closed ? 'Keldi' : 'Keldi') : (r.auto_closed ? 'Ketdi (avto)' : 'Ketdi'),
       r.late_minutes > 0 ? fmtDuration(r.late_minutes) : '',
       r.late_minutes > 0 ? r.late_minutes : 0,
-      r.late_reason || '', r.late_comment || '', r.branch_name || ''
+      r.late_reason || '',
+      [r.late_comment, r.permit_until ? `Ruxsat ${r.permit_until} gacha: ${r.permit_comment || ''}` : '', r.manual ? `Qo'lda (${r.manual_by || ''}): ${r.manual_comment || ''}` : '']
+        .filter(Boolean).join('; '),
+      r.branch_name || ''
     ]);
   });
   const ws = XLSX.utils.aoa_to_sheet(rows);
@@ -1968,7 +2090,7 @@ function exportExcelSessions() {
   sessions.forEach(s => {
     let holat = [];
     if (s.lateMin > 0) holat.push(`${fmtDuration(s.lateMin)} kech`);
-    else if (s.checkin) holat.push('Vaqtida');
+    else if (s.checkin) holat.push(s.noShift ? 'Smena yo\'q' : 'Vaqtida');
     if (!s.checkout) holat.push('Ketdim yo\'q');
     if (s.autoClosed) holat.push('Avto-yopilgan');
     if (!s.checkin) holat.push('Keldimsiz');

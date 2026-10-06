@@ -143,6 +143,31 @@ alter table attendance add column if not exists late_reason text;
 alter table attendance add column if not exists late_comment text;
 alter table attendance add column if not exists auto_closed boolean not null default false;
 alter table attendance add column if not exists late_seconds integer not null default 0;
+-- Kelgan kuni xodimga smena belgilanmagan (kechikishni hisoblab bo'lmaydi) — "Vaqtida" emas, "Smena yo'q" ko'rsatiladi
+alter table attendance add column if not exists no_shift boolean not null default false;
+-- Qo'lda belgilangan davomat (izoh majburiy) va ruxsat bilan surilgan ish boshlanishi
+alter table attendance add column if not exists manual boolean not null default false;
+alter table attendance add column if not exists manual_comment text;
+alter table attendance add column if not exists manual_by text;
+alter table attendance add column if not exists permit_until text;
+alter table attendance add column if not exists permit_comment text;
+
+-- Kechikishga ruxsat: xodimning ma'lum kundagi ish boshlanishi belgilangan vaqtgacha suriladi
+create table if not exists attendance_permits (
+  id uuid primary key default gen_random_uuid(),
+  staff_id uuid references staff(id) on delete cascade,
+  staff_name text,
+  permit_date date not null,
+  allowed_until time not null,
+  comment text not null,
+  created_by text,
+  created_at timestamptz default now(),
+  cancelled boolean not null default false,
+  cancelled_by text,
+  cancelled_at timestamptz
+);
+create unique index if not exists permits_active_uidx on attendance_permits (staff_id, permit_date) where not cancelled;
+create index if not exists permits_date_idx on attendance_permits (permit_date desc);
 update attendance set late_seconds = late_minutes * 60 where late_seconds = 0 and coalesce(late_minutes, 0) > 0;
 alter table tasks add column if not exists done boolean default false;
 
@@ -219,7 +244,7 @@ language sql immutable as $$
     'attendance', 'attendance_edit', 'reports',
     'tasks_view', 'tasks_manage',
     'staff_view', 'staff_manage', 'branches',
-    'penalty_settings', 'staff_freeze', 'penalty_cancel'
+    'penalty_settings', 'staff_freeze', 'penalty_cancel', 'attendance_permit'
   ]
 $$;
 
@@ -353,8 +378,13 @@ language sql immutable as $$
     cos(radians(lat1)) * cos(radians(lat2)) * power(sin(radians(lon2 - lon1) / 2), 2))))
 $$;
 
--- Berilgan Tashkent vaqtiga eng yaqin boshlanadigan smena (o'sha hafta kuni uchun).
--- start_min — smena boshlanishi (daqiqa), dur_min — davomiyligi (end yo'q bo'lsa NULL)
+-- Kelgan vaqtga tegishli smena (o'sha hafta kuni uchun). Tartib:
+--   1) hozir davom etayotgan smena (boshlangan, hali tugamagan) — bir nechta bo'lsa eng kech boshlangani;
+--   2) bo'lmasa — hali boshlanmagan eng yaqin smena (xodim erta keldi → kechikish yo'q);
+--   3) bo'lmasa — bugungi smenalarning eng oxirgisi (hammasi tugagandan keyin keldi).
+-- Avval "boshlanishi eng yaqin" smena olinardi: 09:00–13:00 va 14:00–18:00 smenali xodim
+-- 11:40 da kelsa, 14:00 smenasiga "erta keldi" deb hisoblanib, kechikish 0 chiqardi.
+-- start_min — smena boshlanishi (daqiqa), dur_min — davomiyligi (end yo'q bo'lsa NULL, oyna 4 soat deb olinadi)
 create or replace function public.pick_shift(p_shifts jsonb, p_local timestamp)
 returns table (start_min int, dur_min int)
 language plpgsql immutable as $$
@@ -363,7 +393,10 @@ declare
   sh jsonb;
   v_dow int := extract(dow from p_local)::int;
   v_hm int := extract(hour from p_local)::int * 60 + extract(minute from p_local)::int;
-  b_start int; b_dur int; s int; e int; d int;
+  s int; e int; d int; w_end int;
+  in_s int; in_d int;                  -- davom etayotgan smena
+  up_s int; up_d int;                  -- boshlanmagan eng yaqin smena
+  last_s int; last_d int; last_end int; -- tugagan smenalardan eng kech tugagani
 begin
   if arr is null then return; end if;
   if jsonb_typeof(arr) = 'string' then arr := (arr #>> '{}')::jsonb; end if;
@@ -379,11 +412,21 @@ begin
     if coalesce(sh ->> 'end', '') ~ '^\d{1,2}:\d{2}' then
       e := split_part(sh ->> 'end', ':', 1)::int * 60 + split_part(sh ->> 'end', ':', 2)::int;
       d := e - s;
-      if d <= 0 then d := d + 1440; end if;
+      if d <= 0 then d := d + 1440; end if;  -- yarim tundan o'tadigan smena
     end if;
-    if b_start is null or abs(v_hm - s) < abs(v_hm - b_start) then b_start := s; b_dur := d; end if;
+    w_end := s + coalesce(d, 240);
+    if v_hm >= s and v_hm < w_end then
+      if in_s is null or s > in_s then in_s := s; in_d := d; end if;
+    elsif v_hm < s then
+      if up_s is null or s < up_s then up_s := s; up_d := d; end if;
+    elsif last_end is null or w_end > last_end then
+      last_end := w_end; last_s := s; last_d := d;
+    end if;
   end loop;
-  if b_start is not null then start_min := b_start; dur_min := b_dur; return next; end if;
+  if in_s is not null then start_min := in_s; dur_min := in_d; return next;
+  elsif up_s is not null then start_min := up_s; dur_min := up_d; return next;
+  elsif last_s is not null then start_min := last_s; dur_min := last_d; return next;
+  end if;
 end $$;
 
 -- Kechikish (soniyalarda) va tegishli smena boshlanishi. Kechikish = kelgan vaqt − eng yaqin smena boshi.
@@ -404,6 +447,39 @@ begin
   return next;
 end $$;
 drop function if exists public.late_minutes_for(jsonb, timestamptz);
+
+-- Kechikish + shu kunga berilgan ruxsat. Ruxsat vaqti tanlangan smena oralig'ida bo'lsa,
+-- ish boshlanishi o'sha vaqtga suriladi (shu vaqtgacha kelsa — kechikish yo'q).
+create or replace function public.lateness_with_permit(p_staff_id uuid, p_shifts jsonb, p_time timestamptz)
+returns table (late_seconds int, shift_start_min int, permit_until text, permit_comment text)
+language plpgsql stable security definer set search_path = public as $$
+declare
+  v_local timestamp := p_time at time zone 'Asia/Tashkent';
+  sh record; pm attendance_permits; v_start int; v_until int; v_sec int;
+begin
+  permit_until := null; permit_comment := null;
+  select * into sh from public.pick_shift(p_shifts, v_local);
+  if not found then
+    late_seconds := 0; shift_start_min := null; return next; return;
+  end if;
+  v_start := sh.start_min;
+  select * into pm from attendance_permits
+   where staff_id = p_staff_id and permit_date = v_local::date and not cancelled
+   order by created_at desc limit 1;
+  if found then
+    v_until := extract(hour from pm.allowed_until)::int * 60 + extract(minute from pm.allowed_until)::int;
+    if v_until > v_start and v_until < v_start + coalesce(sh.dur_min, 240) then
+      v_start := v_until;
+      permit_until := to_char(pm.allowed_until, 'HH24:MI');
+      permit_comment := pm.comment;
+    end if;
+  end if;
+  v_sec := extract(hour from v_local)::int * 3600 + extract(minute from v_local)::int * 60
+           + floor(extract(second from v_local))::int;
+  late_seconds := greatest(0, v_sec - v_start * 60);
+  shift_start_min := v_start;
+  return next;
+end $$;
 
 -- Matn yordamchilari (bildirishnoma matni uchun)
 create or replace function public.fmt_money(x numeric) returns text
@@ -571,7 +647,10 @@ begin
 
   v_body := concat_ws(E'\n',
     '📅 Kun: ' || to_char(v_local, 'DD.MM.YYYY') || ', ' || v_dows[extract(dow from v_local)::int + 1],
-    case when v_shift is not null then '🕘 Ish boshlanishi: ' || v_shift end,
+    case when v_shift is not null then '🕘 Ish boshlanishi: ' || v_shift
+      || case when p_att.permit_until is not null then ' (ruxsat bilan surilgan)' else '' end end,
+    case when p_att.permit_until is not null then '📝 Ruxsat izohi: ' || p_att.permit_comment end,
+    case when p_att.manual then '✍️ Qo''lda belgilandi (' || coalesce(p_att.manual_by, 'admin') || '): ' || coalesce(p_att.manual_comment, '') end,
     '🚪 Kelgan vaqt: ' || to_char(v_local, 'HH24:MI:SS'),
     '⏱ Kechikish: ' || fmt_late(p_att.late_seconds) || ' (' || p_att.late_minutes || ' daqiqa)',
     case when v_kind = 'fine' then
@@ -666,7 +745,7 @@ language plpgsql security definer set search_path = public as $$
 declare
   s staff; b branches; v_last attendance; rec attendance;
   v_today date := (now() at time zone 'Asia/Tashkent')::date;
-  v_open boolean; v_late int := 0; v_shift int; v_pen jsonb; v_frz jsonb;
+  v_open boolean; v_late int := 0; v_shift int; v_pen jsonb; v_frz jsonb; v_pu text; v_pc text;
 begin
   select * into s from staff where user_id = auth.uid();
   if not found then raise exception 'NOT_STAFF' using errcode = '42501'; end if;
@@ -694,11 +773,14 @@ begin
   end if;
 
   if p_type = 'checkin' then
-    select l.late_seconds, l.shift_start_min into v_late, v_shift from public.lateness_for(s.shifts, now()) l;
+    select l.late_seconds, l.shift_start_min, l.permit_until, l.permit_comment into v_late, v_shift, v_pu, v_pc
+      from public.lateness_with_permit(s.id, s.shifts, now()) l;
   end if;
 
-  insert into attendance (staff_id, staff_name, branch_id, branch_name, type, time, late_minutes, late_seconds, lat, lng)
-  values (s.id, s.name, b.id, b.name, p_type, now(), coalesce(v_late, 0) / 60, coalesce(v_late, 0), p_lat, p_lng)
+  insert into attendance (staff_id, staff_name, branch_id, branch_name, type, time, late_minutes, late_seconds, no_shift,
+                          permit_until, permit_comment, lat, lng)
+  values (s.id, s.name, b.id, b.name, p_type, now(), coalesce(v_late, 0) / 60, coalesce(v_late, 0),
+          p_type = 'checkin' and v_shift is null, v_pu, v_pc, p_lat, p_lng)
   returning * into rec;
 
   v_pen := public.apply_lateness(rec, s, v_shift);
@@ -706,27 +788,115 @@ begin
   return jsonb_build_object('attendance', to_jsonb(rec), 'penalty', v_pen, 'freeze', v_frz);
 end $$;
 
--- Admin qo'lda davomat qo'shishi (kechikish va jarima xuddi shu qoida bilan)
+-- Admin qo'lda davomat qo'shishi: IZOH MAJBURIY. Kechikish, ruxsat va jarima xuddi shu qoida bilan.
 drop function if exists public.admin_add_attendance(uuid, uuid, text, timestamptz);
-create function public.admin_add_attendance(p_staff_id uuid, p_branch_id uuid, p_type text, p_time timestamptz)
+create or replace function public.admin_add_attendance(p_staff_id uuid, p_branch_id uuid, p_type text, p_time timestamptz, p_comment text)
 returns jsonb
 language plpgsql security definer set search_path = public as $$
-declare s staff; b branches; rec attendance; v_late int := 0; v_shift int; v_pen jsonb; v_frz jsonb;
+declare s staff; b branches; rec attendance; v_late int := 0; v_shift int; v_pen jsonb; v_frz jsonb; v_pu text; v_pc text; v_by text;
 begin
   if not public.admin_can('attendance_edit') then raise exception 'FORBIDDEN' using errcode = '42501'; end if;
   if p_type not in ('checkin', 'checkout') then raise exception 'BAD_TYPE'; end if;
+  p_comment := btrim(coalesce(p_comment, ''));
+  if p_comment = '' then raise exception 'NEED_COMMENT'; end if;
   select * into s from staff where id = p_staff_id;
   if not found then raise exception 'NO_STAFF'; end if;
   select * into b from branches where id = p_branch_id;
+  v_by := coalesce((select name from admins where user_id = auth.uid()),
+                   (select name from staff where user_id = auth.uid()), 'Admin');
   if p_type = 'checkin' then
-    select l.late_seconds, l.shift_start_min into v_late, v_shift from public.lateness_for(s.shifts, p_time) l;
+    select l.late_seconds, l.shift_start_min, l.permit_until, l.permit_comment into v_late, v_shift, v_pu, v_pc
+      from public.lateness_with_permit(s.id, s.shifts, p_time) l;
   end if;
-  insert into attendance (staff_id, staff_name, branch_id, branch_name, type, time, late_minutes, late_seconds)
-  values (s.id, s.name, b.id, b.name, p_type, p_time, coalesce(v_late, 0) / 60, coalesce(v_late, 0))
+  insert into attendance (staff_id, staff_name, branch_id, branch_name, type, time, late_minutes, late_seconds, no_shift,
+                          permit_until, permit_comment, manual, manual_comment, manual_by)
+  values (s.id, s.name, b.id, b.name, p_type, p_time, coalesce(v_late, 0) / 60, coalesce(v_late, 0),
+          p_type = 'checkin' and v_shift is null, v_pu, v_pc, true, left(p_comment, 500), v_by)
   returning * into rec;
   v_pen := public.apply_lateness(rec, s, v_shift);
   if rec.late_seconds > 0 then v_frz := public.check_freeze(s.id); end if;
   return jsonb_build_object('attendance', to_jsonb(rec), 'penalty', v_pen, 'freeze', v_frz);
+end $$;
+
+-- =============================================
+-- KECHIKISHGA RUXSAT ("attendance_permit" ruxsati)
+-- Xodimning ma'lum kundagi ish boshlanishi belgilangan vaqtga suriladi. Izoh majburiy.
+-- Ruxsat xodim "Keldim" qilishidan OLDIN beriladi; kelgandan keyin — "Jarimani bekor qilish" ishlatiladi.
+-- =============================================
+create or replace function public.grant_permit(p_staff uuid, p_date date, p_until text, p_comment text) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  s staff; sh record; v_until time; v_until_min int; v_by text; v_id uuid; v_shift text; v_old int;
+begin
+  if not public.admin_can('attendance_permit') then raise exception 'FORBIDDEN' using errcode = '42501'; end if;
+  p_comment := btrim(coalesce(p_comment, ''));
+  if p_comment = '' then raise exception 'NEED_COMMENT'; end if;
+  if coalesce(p_until, '') !~ '^\d{1,2}:\d{2}$' then raise exception 'BAD_TIME'; end if;
+  v_until := p_until::time;
+  if p_date is null or p_date < (now() at time zone 'Asia/Tashkent')::date then raise exception 'PAST_DATE'; end if;
+  select * into s from staff where id = p_staff;
+  if not found then raise exception 'NO_STAFF'; end if;
+
+  -- Ruxsat vaqti o'sha kungi smena oralig'ida bo'lishi kerak
+  select * into sh from public.pick_shift(s.shifts, p_date + v_until);
+  v_until_min := extract(hour from v_until)::int * 60 + extract(minute from v_until)::int;
+  if not found then raise exception 'NO_SHIFT_DAY'; end if;
+  if not (v_until_min > sh.start_min and v_until_min < sh.start_min + coalesce(sh.dur_min, 240)) then
+    raise exception 'TIME_OUT_OF_SHIFT';
+  end if;
+
+  if exists (select 1 from attendance where staff_id = s.id and type = 'checkin'
+             and (time at time zone 'Asia/Tashkent')::date = p_date) then
+    raise exception 'ALREADY_CHECKED_IN';
+  end if;
+
+  v_by := coalesce((select name from admins where user_id = auth.uid()),
+                   (select name from staff where user_id = auth.uid()), 'Admin');
+  -- Shu kunga oldingi ruxsat bo'lsa — yangisi bilan almashtiriladi
+  update attendance_permits set cancelled = true, cancelled_by = v_by, cancelled_at = now()
+   where staff_id = s.id and permit_date = p_date and not cancelled;
+  get diagnostics v_old = row_count;
+
+  insert into attendance_permits (staff_id, staff_name, permit_date, allowed_until, comment, created_by)
+  values (s.id, s.name, p_date, v_until, left(p_comment, 500), v_by)
+  returning id into v_id;
+
+  v_shift := lpad((sh.start_min / 60)::text, 2, '0') || ':' || lpad((sh.start_min % 60)::text, 2, '0');
+  insert into tasks (title, body, type, assigned_to, assigned_name, created_by, replies, done)
+  values ('🕘 Kechikishga ruxsat: ' || to_char(p_date, 'DD.MM.YYYY') || ', ' || to_char(v_until, 'HH24:MI') || ' gacha',
+          concat_ws(E'\n',
+            '📅 Kun: ' || to_char(p_date, 'DD.MM.YYYY'),
+            '🕘 Ish boshlanishi ' || v_shift || ' → ' || to_char(v_until, 'HH24:MI') || ' ga surildi',
+            'Shu vaqtgacha kelsangiz, kechikish va jarima hisoblanmaydi.',
+            '📝 Izoh: ' || left(p_comment, 500),
+            '👤 Ruxsat berdi: ' || v_by,
+            case when v_old > 0 then '♻️ Shu kunga avvalgi ruxsat almashtirildi.' end),
+          'note', s.id, s.name, 'system', '[]'::jsonb, false);
+
+  return jsonb_build_object('id', v_id, 'staff_name', s.name, 'date', p_date, 'until', to_char(v_until, 'HH24:MI'),
+                            'shift_start', v_shift, 'replaced', v_old > 0);
+end $$;
+
+create or replace function public.cancel_permit(p_id uuid) returns void
+language plpgsql security definer set search_path = public as $$
+declare pm attendance_permits; v_by text;
+begin
+  if not public.admin_can('attendance_permit') then raise exception 'FORBIDDEN' using errcode = '42501'; end if;
+  select * into pm from attendance_permits where id = p_id for update;
+  if not found or pm.cancelled then raise exception 'NOT_FOUND'; end if;
+  if exists (select 1 from attendance where staff_id = pm.staff_id and type = 'checkin'
+             and (time at time zone 'Asia/Tashkent')::date = pm.permit_date) then
+    raise exception 'PERMIT_USED';
+  end if;
+  v_by := coalesce((select name from admins where user_id = auth.uid()),
+                   (select name from staff where user_id = auth.uid()), 'Admin');
+  update attendance_permits set cancelled = true, cancelled_by = v_by, cancelled_at = now() where id = pm.id;
+  if pm.staff_id is not null then
+    insert into tasks (title, body, type, assigned_to, assigned_name, created_by, replies, done)
+    values ('❌ Kechikishga ruxsat bekor qilindi: ' || to_char(pm.permit_date, 'DD.MM.YYYY'),
+            '📅 Kun: ' || to_char(pm.permit_date, 'DD.MM.YYYY') || E'\nIsh vaqtingiz odatdagidek.' || E'\n👤 Bekor qildi: ' || v_by,
+            'note', pm.staff_id, pm.staff_name, 'system', '[]'::jsonb, false);
+  end if;
 end $$;
 
 -- =============================================
@@ -772,7 +942,8 @@ begin
     'app_role()', 'is_admin()', 'admin_can(text)', 'admin_can_any(text[])', 'my_staff_id()', 'whoami()',
     'update_my_name(text)', 'set_admin_permissions(uuid,jsonb)', 'set_staff_penalty(uuid,boolean)',
     'close_my_stale_session()', 'staff_check(text,float8,float8,uuid)',
-    'admin_add_attendance(uuid,uuid,text,timestamptz)', 'can_see_task(uuid)',
+    'admin_add_attendance(uuid,uuid,text,timestamptz,text)', 'can_see_task(uuid)',
+    'grant_permit(uuid,date,text,text)', 'cancel_permit(uuid)',
     'task_set_done(uuid,boolean)', 'task_add_reply(uuid,text)',
     'unfreeze_staff(uuid)', 'set_freeze_limit(int)', 'staff_late_totals()', 'cancel_penalty(uuid,text)'
   ] loop
@@ -781,6 +952,7 @@ begin
   end loop;
   -- Ichki funksiya: faqat boshqa server funksiyalari chaqiradi
   revoke all on function public.apply_lateness(attendance, staff, int) from public, anon, authenticated;
+  revoke all on function public.lateness_with_permit(uuid, jsonb, timestamptz) from public, anon, authenticated;
   revoke all on function public.check_freeze(uuid) from public, anon, authenticated;
 end $$;
 
@@ -795,6 +967,7 @@ alter table tasks            enable row level security;
 alter table app_tags         enable row level security;
 alter table penalty_settings enable row level security;
 alter table penalties        enable row level security;
+alter table attendance_permits enable row level security;
 
 -- Oldingi siyosatlarni tozalash
 do $$
@@ -802,7 +975,7 @@ declare r record;
 begin
   for r in select policyname, tablename from pg_policies
            where schemaname = 'public'
-             and tablename in ('branches','staff','admins','attendance','tasks','app_tags','penalty_settings','penalties')
+             and tablename in ('branches','staff','admins','attendance','tasks','app_tags','penalty_settings','penalties','attendance_permits')
   loop
     execute format('drop policy if exists %I on public.%I', r.policyname, r.tablename);
   end loop;
@@ -841,6 +1014,11 @@ create policy penset_update on penalty_settings for update to authenticated
   using (public.admin_can('penalty_settings')) with check (public.admin_can('penalty_settings'));
 
 -- Jarima / intizom tarixi: "dashboard_penalties" ruxsati bor admin yoki xodimning o'zi. Yozish — faqat server
+-- Ruxsatlar: ruxsati bor admin yoki xodimning o'zi. Yozish — faqat RPC (grant_permit / cancel_permit)
+create policy permits_read on attendance_permits for select to authenticated
+  using (public.admin_can_any(array['attendance_permit', 'attendance', 'attendance_edit', 'reports'])
+         or staff_id = public.my_staff_id());
+
 create policy penalties_read on penalties for select to authenticated
   using (public.admin_can_any(array['dashboard_penalties', 'penalty_cancel']) or staff_id = public.my_staff_id());
 
