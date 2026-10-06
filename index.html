@@ -24,11 +24,56 @@
 </head>
 
 <body>
+  <!-- IKONKALAR (Lucide, ISC litsenziya). Ishlatish: <svg class="ic"><use href="#i-nomi"></use></svg> yoki JS: ic('nomi') -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+    <symbol id="i-check-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></symbol>
+    <symbol id="i-x-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></symbol>
+    <symbol id="i-alert-triangle" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
+    <symbol id="i-alert-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></symbol>
+    <symbol id="i-ban" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+    <symbol id="i-timer" viewBox="0 0 24 24"><path d="M10 2h4"/><path d="m12 14 3-3"/><circle cx="12" cy="14" r="8"/></symbol>
+    <symbol id="i-calendar" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+    <symbol id="i-building" viewBox="0 0 24 24"><rect width="16" height="20" x="4" y="2" rx="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01"/><path d="M16 6h.01"/><path d="M12 6h.01"/><path d="M12 10h.01"/><path d="M12 14h.01"/><path d="M16 10h.01"/><path d="M16 14h.01"/><path d="M8 10h.01"/><path d="M8 14h.01"/></symbol>
+    <symbol id="i-map-pin" viewBox="0 0 24 24"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></symbol>
+    <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></symbol>
+    <symbol id="i-pen-line" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+    <symbol id="i-lock-open" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></symbol>
+    <symbol id="i-snowflake" viewBox="0 0 24 24"><path d="M2 12h20"/><path d="M12 2v20"/><path d="m20 16-4-4 4-4"/><path d="m4 8 4 4-4 4"/><path d="m16 4-4 4-4-4"/><path d="m8 20 4-4 4 4"/></symbol>
+    <symbol id="i-banknote" viewBox="0 0 24 24"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></symbol>
+    <symbol id="i-scale" viewBox="0 0 24 24"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/></symbol>
+    <symbol id="i-file-text" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></symbol>
+    <symbol id="i-clipboard" viewBox="0 0 24 24"><rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></symbol>
+    <symbol id="i-bar-chart" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 21v-7"/><path d="M4 10V3"/><path d="M12 21v-9"/><path d="M12 8V3"/><path d="M20 21v-5"/><path d="M20 12V3"/><path d="M2 14h4"/><path d="M10 8h4"/><path d="M18 16h4"/></symbol>
+    <symbol id="i-message" viewBox="0 0 24 24"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></symbol>
+    <symbol id="i-phone" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></symbol>
+    <symbol id="i-tag" viewBox="0 0 24 24"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r="1"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></symbol>
+    <symbol id="i-log-in" viewBox="0 0 24 24"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="m10 17 5-5-5-5"/><path d="M15 12H3"/></symbol>
+    <symbol id="i-log-out" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></symbol>
+    <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5 5.5 5.5 0 0 1-5.5 5.5H11"/></symbol>
+    <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></symbol>
+    <symbol id="i-table" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M12 3v18"/></symbol>
+    <symbol id="i-door" viewBox="0 0 24 24"><path d="M13 4h3a2 2 0 0 1 2 2v14"/><path d="M2 20h3"/><path d="M13 20h9"/><path d="M10 12v.01"/><path d="M13 4.562v16.157a1 1 0 0 1-1.242.97L5 20V5.562a2 2 0 0 1 1.515-1.94l4-1A2 2 0 0 1 13 4.561Z"/></symbol>
+    <symbol id="i-repeat" viewBox="0 0 24 24"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></symbol>
+  </svg>
   <div class="orb orb1"></div>
   <div class="orb orb2"></div>
   <div class="orb orb3"></div>
 
-  <div id="toast">✓ Saqlandi</div>
+  <div id="toast"></div>
 
   <!-- GLOBAL LOADER -->
   <div id="loader-overlay">
@@ -52,7 +97,7 @@
     <button class="btn btn-sm btn-primary" id="install-action" onclick="doInstall()"
       style="flex-shrink:0;">O'rnatish</button>
     <button onclick="dismissInstall()"
-      style="background:none;border:none;color:var(--text3);font-size:18px;cursor:pointer;flex-shrink:0;padding:0 4px;">✕</button>
+      style="background:none;border:none;color:var(--text3);font-size:18px;cursor:pointer;flex-shrink:0;padding:0 4px;" aria-label="Yopish"><svg class="ic" aria-hidden="true"><use href="#i-x"></use></svg></button>
   </div>
 
   <!-- BRANCH PICK MODAL (bir nechta filial radiusida bo'lganda) -->
@@ -83,7 +128,7 @@
   <div class="modal-overlay" id="modal-info">
     <div class="modal" style="max-width:380px;text-align:center;">
       <div class="modal-handle"></div>
-      <div id="info-icon" style="font-size:44px;margin-bottom:10px;">⏰</div>
+      <div id="info-icon" style="margin-bottom:10px;color:var(--accent);"><svg class="ic ic-xl" aria-hidden="true"><use href="#i-clock"></use></svg></div>
       <div class="modal-title" id="info-title" style="text-align:center;">Eslatma</div>
       <p id="info-text" style="font-size:14px;color:var(--text2);margin-bottom:20px;line-height:1.5;white-space:pre-line;"></p>
       <button class="btn btn-primary btn-full" onclick="closeModal('modal-info')">Tushunarli</button>
@@ -132,9 +177,9 @@
         <p id="auth-subtitle">O'quv markazi boshqaruv tizimi</p>
       </div>
       <div class="lang-btns">
-        <button class="lang-btn active" onclick="setLang('uz')">🇺🇿 UZB</button>
-        <button class="lang-btn" onclick="setLang('ru')">🇷🇺 RUS</button>
-        <button class="lang-btn" onclick="setLang('en')">🇬🇧 ENG</button>
+        <button class="lang-btn active" onclick="setLang('uz')">UZB</button>
+        <button class="lang-btn" onclick="setLang('ru')">RUS</button>
+        <button class="lang-btn" onclick="setLang('en')">ENG</button>
       </div>
       <div class="inp-group">
         <label id="lbl-login">Login</label>
@@ -154,10 +199,10 @@
   <!-- MUZLATILGAN PROFIL EKRANI (xodim) -->
   <div id="frozen-screen" style="display:none;min-height:100vh;align-items:center;justify-content:center;padding:24px;">
     <div class="auth-card" style="text-align:center;">
-      <div style="font-size:56px;margin-bottom:8px;">🧊</div>
+      <div style="margin-bottom:8px;color:var(--accent);"><svg class="ic ic-xl" aria-hidden="true"><use href="#i-snowflake"></use></svg></div>
       <div style="font-size:20px;font-weight:800;margin-bottom:14px;color:var(--red);">Profil muzlatilgan</div>
       <p id="frozen-message" style="font-size:15px;line-height:1.6;color:var(--text);margin-bottom:20px;"></p>
-      <a href="tel:+998900715544" class="btn btn-secondary btn-full" style="text-decoration:none;margin-bottom:10px;">📞 Rahbariyat bilan bog'lanish</a>
+      <a href="tel:+998900715544" class="btn btn-secondary btn-full" style="text-decoration:none;margin-bottom:10px;"><svg class="ic" aria-hidden="true"><use href="#i-phone"></use></svg> Rahbariyat bilan bog'lanish</a>
       <button class="btn btn-danger btn-full" onclick="doLogout()">Chiqish</button>
     </div>
   </div>
@@ -172,9 +217,9 @@
       </div>
       <div class="top-bar-right">
         <button class="btn btn-icon btn-secondary" onclick="refreshAll(this)" title="Yangilash" id="btn-refresh"
-          style="font-size:17px;">⟳</button>
+          style="font-size:17px;" aria-label="Yangilash"><svg class="ic" aria-hidden="true"><use href="#i-refresh"></use></svg></button>
         <button class="btn btn-icon btn-secondary" onclick="toggleTheme()" title="Tema" id="btn-theme"
-          style="font-size:18px;">☀</button>
+          style="font-size:18px;" aria-label="Tema"><svg class="ic" aria-hidden="true"><use href="#i-sun"></use></svg></button>
         <div class="avatar" id="user-avatar" onclick="showPage('settings')">?</div>
       </div>
     </div>
@@ -185,7 +230,7 @@
     <div class="page" id="page-dashboard">
       <div class="page-content">
         <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;">
-          <span style="font-size:12px;color:var(--text2);font-weight:600;">📅 Sana:</span>
+          <span style="font-size:12px;color:var(--text2);font-weight:600;display:inline-flex;align-items:center;gap:4px;"><svg class="ic" aria-hidden="true"><use href="#i-calendar"></use></svg> Sana:</span>
           <input type="date" id="dash-date" onchange="renderDashboard()" style="flex:1;min-width:130px;padding:9px 12px;border-radius:12px;border:none;background:var(--inset-bg);color:var(--text);box-shadow:var(--shadow-in);font-family:'Manrope',sans-serif;font-size:13px;">
         </div>
         <div class="stat-grid" id="dash-stats" style="grid-template-columns:1fr 1fr;display:none;">
@@ -210,7 +255,7 @@
         <div id="dash-absent-card" style="display:none;"></div>
         <div class="card" id="dash-pen-card" style="display:none;"></div>
         <div class="empty" id="dash-empty" style="display:none;">
-          <div class="empty-icon">🔒</div>
+          <div class="empty-icon"><svg class="ic" aria-hidden="true"><use href="#i-lock"></use></svg></div>
           <h3>Dashboard elementlari uchun ruxsat berilmagan</h3>
         </div>
       </div>
@@ -238,11 +283,11 @@
 
         <button class="btn btn-primary btn-full" id="btn-checkin" onclick="myCheck('checkin')"
           style="padding:18px;font-size:16px;margin-bottom:12px;">
-          ⬆ Keldim
+          <svg class="ic" aria-hidden="true"><use href="#i-log-in"></use></svg> Keldim
         </button>
         <button class="btn btn-secondary btn-full" id="btn-checkout" onclick="myCheck('checkout')"
           style="padding:18px;font-size:16px;margin-bottom:14px;">
-          ⬇ Ketdim
+          <svg class="ic" aria-hidden="true"><use href="#i-log-out"></use></svg> Ketdim
         </button>
 
         <div id="my-status-box" class="card" style="display:none;">
@@ -306,10 +351,10 @@
             </select>
           </div>
           <button class="btn btn-secondary btn-full" onclick="exportExcel()" style="margin-bottom:8px;">
-            📊 Excel yuklab olish (jadval)
+            <svg class="ic" aria-hidden="true"><use href="#i-table"></use></svg> Excel yuklab olish (jadval)
           </button>
           <button class="btn btn-secondary btn-full" onclick="exportExcelSessions()" style="margin-bottom:14px;">
-            📋 Excel: ish sessiyalari (Keldi–Ketdi)
+            <svg class="ic" aria-hidden="true"><use href="#i-clipboard"></use></svg> Excel: ish sessiyalari (Keldi–Ketdi)
           </button>
           <div class="card" id="report-summary" style="display:none;margin-bottom:14px;"></div>
           <div class="card" id="report-chart-card" style="display:none;">
@@ -339,7 +384,7 @@
         <!-- ISSUES TAB (kelmagan / tugatmagan) -->
         <div id="att-issues" class="hidden">
           <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;">
-            <span style="font-size:12px;color:var(--text2);font-weight:600;">📅 Sana:</span>
+            <span style="font-size:12px;color:var(--text2);font-weight:600;display:inline-flex;align-items:center;gap:4px;"><svg class="ic" aria-hidden="true"><use href="#i-calendar"></use></svg> Sana:</span>
             <input type="date" id="issues-date" onchange="renderIssues()"
               style="flex:1;padding:9px 12px;border-radius:12px;border:none;background:var(--inset-bg);color:var(--text);box-shadow:var(--shadow-in);font-family:'Manrope',sans-serif;font-size:13px;">
           </div>
@@ -390,7 +435,7 @@
         <!-- JARIMA SOZLAMALARI ("penalty_settings" ruxsati) -->
         <div id="adm-penalty" class="hidden">
           <div class="card">
-            <div style="font-weight:700;font-size:14px;margin-bottom:6px;">💰 Kechikish jarimasi</div>
+            <div style="font-weight:700;font-size:14px;margin-bottom:6px;display:flex;align-items:center;gap:8px;"><svg class="ic" aria-hidden="true"><use href="#i-banknote"></use></svg> Kechikish jarimasi</div>
             <p style="font-size:12px;color:var(--text3);margin-bottom:12px;">Faqat Super Admin jarima tizimiga kiritgan
               xodimlarga qo'llanadi. Har bir to'liq vaqt birligi uchun hisoblanadi.</p>
             <div class="inp-group">
@@ -417,20 +462,20 @@
             <div id="pen-example" style="font-size:12px;color:var(--text2);margin-bottom:12px;"></div>
           </div>
           <div class="card">
-            <div style="font-weight:700;font-size:14px;margin-bottom:6px;">⚖️ Intizomiy choralar</div>
+            <div style="font-weight:700;font-size:14px;margin-bottom:6px;display:flex;align-items:center;gap:8px;"><svg class="ic" aria-hidden="true"><use href="#i-scale"></use></svg> Intizomiy choralar</div>
             <p style="font-size:12px;color:var(--text3);margin-bottom:12px;">Jarima tizimiga kiritilmagan xodimlarga
               kechikish davomiyligiga qarab qo'llanadi. Jarima tizimidagi xodimlarga faqat Tanbeh va Qattiq tanbeh
               qo'shimcha ko'rsatiladi.</p>
             <div class="inp-group">
-              <label>⚠️ Ogohlantirish — necha daqiqadan</label>
+              <label><svg class="ic" aria-hidden="true"><use href="#i-alert-triangle"></use></svg> Ogohlantirish — necha daqiqadan</label>
               <input type="number" id="pen-warning" min="2" step="1" inputmode="numeric">
             </div>
             <div class="inp-group">
-              <label>❗ Tanbeh — necha daqiqadan</label>
+              <label><svg class="ic" aria-hidden="true"><use href="#i-alert-circle"></use></svg> Tanbeh — necha daqiqadan</label>
               <input type="number" id="pen-reprimand" min="3" step="1" inputmode="numeric">
             </div>
             <div class="inp-group">
-              <label>⛔ Qattiq tanbeh — necha daqiqadan</label>
+              <label><svg class="ic" aria-hidden="true"><use href="#i-ban"></use></svg> Qattiq tanbeh — necha daqiqadan</label>
               <input type="number" id="pen-severe" min="4" step="1" inputmode="numeric">
             </div>
             <div id="pen-levels" style="font-size:12px;color:var(--text2);margin-bottom:12px;"></div>
@@ -440,7 +485,7 @@
         <!-- MUZLATISH ("staff_freeze" ruxsati) -->
         <div id="adm-freeze" class="hidden">
           <div class="card">
-            <div style="font-weight:700;font-size:14px;margin-bottom:6px;">🧊 Muzlatish chegarasi</div>
+            <div style="font-weight:700;font-size:14px;margin-bottom:6px;display:flex;align-items:center;gap:8px;"><svg class="ic" aria-hidden="true"><use href="#i-snowflake"></use></svg> Muzlatish chegarasi</div>
             <p style="font-size:12px;color:var(--text3);margin-bottom:12px;">Xodimning jami kechikishi shu miqdorga yetsa,
               profili avtomatik muzlatiladi. Hisob funksiya yoqilgan yoki oxirgi marta muzlatishdan chiqarilgan paytdan
               boshlanadi.</p>
@@ -528,22 +573,22 @@
             Texnik yordam</div>
           <a href="tel:+998900715544" style="text-decoration:none;color:inherit;">
             <div class="settings-row" style="cursor:pointer;">
-              <span style="display:flex;align-items:center;gap:10px;">📞 Telefon</span>
+              <span style="display:flex;align-items:center;gap:10px;"><svg class="ic" aria-hidden="true"><use href="#i-phone"></use></svg> Telefon</span>
               <span style="color:var(--accent);font-weight:700;">+998 90 071 55 44</span>
             </div>
           </a>
           <a href="https://t.me/xn_prgm" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;">
             <div class="settings-row" style="cursor:pointer;">
-              <span style="display:flex;align-items:center;gap:10px;">✈️ Telegram</span>
+              <span style="display:flex;align-items:center;gap:10px;"><svg class="ic" aria-hidden="true"><use href="#i-send"></use></svg> Telegram</span>
               <span style="color:var(--accent);font-weight:700;">@xn_prgm</span>
             </div>
           </a>
           <div class="settings-row">
-            <span style="display:flex;align-items:center;gap:10px;">🏷️ Tizim versiyasi</span>
+            <span style="display:flex;align-items:center;gap:10px;"><svg class="ic" aria-hidden="true"><use href="#i-tag"></use></svg> Tizim versiyasi</span>
             <span id="app-version-label" style="color:var(--text2);font-weight:700;"></span>
           </div>
           <button class="btn btn-primary btn-full" onclick="updateApp(this)" id="btn-update-app" style="margin-top:12px;">
-            ⬇ Yangi versiyani o'rnatish</button>
+            <svg class="ic" aria-hidden="true"><use href="#i-download"></use></svg> Yangi versiyani o'rnatish</button>
         </div>
       </div>
     </div>
@@ -730,7 +775,7 @@
       <div class="inp-group">
         <label>Joylashuv (GPS) *</label>
         <button class="btn btn-secondary btn-full" onclick="grabBranchLocation(this)" id="br-loc-btn"
-          style="margin-bottom:8px;">📍 Hozirgi joyni olish</button>
+          style="margin-bottom:8px;"><svg class="ic" aria-hidden="true"><use href="#i-map-pin"></use></svg> Hozirgi joyni olish</button>
         <div style="display:flex;gap:8px;">
           <input type="text" id="br-lat" placeholder="Kenglik (lat)" inputmode="decimal" style="flex:1;">
           <input type="text" id="br-lng" placeholder="Uzunlik (lng)" inputmode="decimal" style="flex:1;">
@@ -761,6 +806,25 @@
       </div>
       <button class="btn btn-secondary btn-full" onclick="closeModal('modal-task-detail')"
         style="margin-top:8px;">Yopish</button>
+    </div>
+  </div>
+
+  <!-- DAVOMATNI O'CHIRISH MODALI -->
+  <div class="modal-overlay" id="modal-delete-att">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div class="modal-title">Davomat yozuvini o'chirish</div>
+      <div id="da-info" class="card" style="font-size:13px;line-height:1.6;white-space:pre-line;margin-bottom:12px;"></div>
+      <div class="inp-group">
+        <label>O'chirish sababi *</label>
+        <textarea id="da-reason" rows="3" maxlength="500" placeholder="Masalan: xato kiritilgan, ikki marta belgilangan" style="resize:none;"></textarea>
+      </div>
+      <p style="font-size:12px;color:var(--text3);margin-bottom:12px;">Yozuv ro'yxat va hisobotlardan olib tashlanadi.
+        Unga bog'langan jarima avtomatik bekor qilinadi, xodimga xabar yuboriladi.</p>
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-secondary" onclick="closeModal('modal-delete-att')" style="flex:1">Yopish</button>
+        <button class="btn btn-danger" onclick="confirmDeleteAttendance(this)" style="flex:1"><svg class="ic" aria-hidden="true"><use href="#i-trash"></use></svg> O'chirish</button>
+      </div>
     </div>
   </div>
 

@@ -44,7 +44,7 @@ SQL Editor'da `supabase_finalize.sql` ni ishga tushiring. Agar Auth'ga bog'lanma
 
 ## 5. Saytni yangilash
 Quyidagi fayllarni hostingga joylang: `index.html`, `app.js`, `styles.css`, `sw.js`, `manifest.json`, ikonkalar.
-Service worker keshi (`jony-kids-v11`) yangilangani uchun telefonlar yangi versiyani o'zi yuklab oladi. Hamma bir marta qayta login qiladi.
+Service worker keshi (`jony-kids-v13`) yangilangani uchun telefonlar yangi versiyani o'zi yuklab oladi. Hamma bir marta qayta login qiladi.
 
 ## 6. Jarima tizimini sozlash (Super Admin)
 1. **Boshqaruv → Jarima:** hisoblash birligini (soniya / daqiqa / soat), summani, valyutani va intizom chegaralarini kiriting.
@@ -53,6 +53,7 @@ Service worker keshi (`jony-kids-v11`) yangilangani uchun telefonlar yangi versi
 4. **Boshqaruv → Muzlatish** ("staff_freeze" ruxsati kerak): jami kechikish chegarasini belgilang (standart: 24 soat). Xodimning kechikishlari shu chegaraga yetsa, profili avtomatik muzlatiladi. Muzlatishdan faqat shu ruxsatga ega admin chiqara oladi (🔓).
 5. **Jarimani bekor qilish** ("penalty_cancel" ruxsati): Dashboard → "Barcha yozuvlar" ro'yxatida yoki Vazifalar panelidagi jarima bildirishnomasida "Bekor qilish" tugmasi. Sabab yozish majburiy, xodimga xabar boradi, yozuv tarixda saqlanadi.
 6. **Kechikishga ruxsat** ("attendance_permit" ruxsati): Davomat → Ruxsatlar → "+ Ruxsat berish". Xodim, kun, qaysi vaqtgacha va izoh (majburiy). Shu vaqtgacha kelsa kechikish va jarima hisoblanmaydi.
+7. **Davomatni o'chirish** ("attendance_delete" ruxsati): Davomat → Kelish/Ketish yoki Hisobot jadvalidagi 🗑 tugmasi. Sabab majburiy. Yozuv bazada "o'chirilgan" deb qoladi, unga bog'langan jarima bekor qilinadi, xodimga xabar boradi.
 
 ## Tekshirish ro'yxati
 - [ ] Xodim kira oladi va faqat "Davomat" bilan "Vazifalar"ni ko'radi

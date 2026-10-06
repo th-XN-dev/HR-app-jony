@@ -24,20 +24,21 @@ const MIN_PASS = 6;
 // Admin ruxsatlari (multi-permission). supabase_setup.sql dagi permission_keys() va
 // Edge Function'dagi PERMISSION_KEYS bilan BIR XIL bo'lishi shart.
 const PERMISSIONS = [
-  { group: '📊 Davomat Dashboard', items: [
+  { group: 'Davomat Dashboard', icon: 'bar-chart', items: [
     ['dashboard', 'Dashboard: umumiy ko\'rsatkichlar'],
     ['dashboard_late', 'Dashboard: kechikkanlar ro\'yxati'],
     ['dashboard_absent', 'Dashboard: kelmagan / Ketdim qilmaganlar'],
     ['dashboard_penalties', 'Dashboard: jarima va intizom xulosasi']] },
-  { group: '📅 Davomat', items: [
+  { group: 'Davomat', icon: 'calendar', items: [
     ['attendance', 'Davomatni ko\'rish (bugungi, kechikkanlar, muammoli)'],
     ['attendance_edit', 'Davomatni qo\'lda belgilash'],
     ['reports', 'Hisobot va Excel eksport'],
-    ['attendance_permit', 'Kechikishga ruxsat berish (ish boshlanishini surish)']] },
-  { group: '📋 Vazifalar', items: [
+    ['attendance_permit', 'Kechikishga ruxsat berish (ish boshlanishini surish)'],
+    ['attendance_delete', 'Davomat yozuvini o\'chirish']] },
+  { group: 'Vazifalar', icon: 'clipboard', items: [
     ['tasks_view', 'Vazifa va bildirishnomalarni ko\'rish'],
     ['tasks_manage', 'Vazifa yaratish / tahrirlash / o\'chirish']] },
-  { group: '⚙️ Boshqaruv', items: [
+  { group: 'Boshqaruv', icon: 'sliders', items: [
     ['staff_view', 'Xodimlar ro\'yxatini ko\'rish'],
     ['staff_manage', 'Xodim qo\'shish / tahrirlash / o\'chirish'],
     ['branches', 'Filiallarni boshqarish'],
@@ -154,12 +155,39 @@ function initialsOf(name) { return String(name || '?').split(' ').filter(Boolean
 // ============================================================
 // STATE
 // ============================================================
-const APP_VERSION = 'upg 21';
+const APP_VERSION = 'upg 23';
 let currentUser = null;
 let staffList = [], branches = [], tasks = [], attendances = [], admins = [];
 let penaltySettings = null;
 let selectedCIType = 'checkin', selectedTaskType = 'task';
 let currentTaskId = null, currentEditStaffId = null, editingTaskId = null;
+
+// SVG ikonka (index.html dagi #i-* to'plamidan)
+function ic(name, cls) {
+  return `<svg class="ic${cls ? ' ' + cls : ''}" aria-hidden="true"><use href="#i-${name}"></use></svg>`;
+}
+
+// Emojilarni olib tashlash — serverdan kelgan (jumladan eski) bildirishnoma matnlari uchun
+const EMOJI_RE = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{2300}-\u{23FF}\u{27F0}-\u{27FF}\u{21A9}\u{FE0F}\u{200D}]\s?/gu;
+function noEmoji(s) {
+  return String(s == null ? '' : s).split('\n').map(l => l.replace(EMOJI_RE, '').trim()).join('\n').trim();
+}
+
+// Tizim bildirishnomasi matnini qatorma-qator ikonkalar bilan chiqarish
+const LINE_ICONS = [
+  [/^(Kun|Kechikish kuni):/, 'calendar'], [/^Ish boshlanishi/, 'clock'], [/^Kelgan vaqt/, 'door'],
+  [/^Kechikish:/, 'timer'], [/^Hisob:/, 'banknote'], [/^Intizomiy chora/, 'scale'], [/bo'yicha:/, 'bar-chart'],
+  [/^(Izoh|Ruxsat izohi)/, 'file-text'], [/^Sabab/, 'message'], [/^(Ruxsat berdi|O'chirdi|Bekor qildi)/, 'user'],
+  [/^Qo'lda/, 'pen-line'], [/^Bekor qilindi/, 'x-circle'], [/bekor qilindi\.?$/, 'check-circle'],
+  [/almashtirildi/, 'repeat'], [/surildi$/, 'clock'], [/— (Keldim|Ketdim)/, 'calendar']
+];
+function richText(text) {
+  return noEmoji(text).split('\n').map(line => {
+    if (!line.trim()) return '<div style="height:6px"></div>';
+    const m = LINE_ICONS.find(([re]) => re.test(line));
+    return `<div class="ic-line">${m ? ic(m[1]) : ''}<span>${esc(line)}</span></div>`;
+  }).join('');
+}
 
 // XSS himoyasi: HTML maxsus belgilarini xavfsizlash
 function esc(s) {
@@ -209,7 +237,7 @@ const T = {
     task: 'Vazifa', note: 'Eslatma', alert: 'Xabarnoma',
     branch: 'Filial', staff: 'Xodim', reply: 'Javob',
     late: 'Kechikkan', on_time: 'Vaqtida', no_data: 'Ma\'lumot yo\'q',
-    saved: '✓ Saqlandi', deleted: '🗑 O\'chirildi', error: 'Xatolik yuz berdi',
+    saved: 'Saqlandi', deleted: 'O\'chirildi', error: 'Xatolik yuz berdi',
     auth_sub: 'O\'quv markazi boshqaruv tizimi', wrong_creds: 'Login yoki parol noto\'g\'ri'
   },
   ru: {
@@ -224,7 +252,7 @@ const T = {
     task: 'Задача', note: 'Заметка', alert: 'Уведомление',
     branch: 'Филиал', staff: 'Сотрудник', reply: 'Ответ',
     late: 'Опоздавшие', on_time: 'Вовремя', no_data: 'Нет данных',
-    saved: '✓ Сохранено', deleted: '🗑 Удалено', error: 'Произошла ошибка',
+    saved: 'Сохранено', deleted: 'Удалено', error: 'Произошла ошибка',
     auth_sub: 'Система управления учебным центром', wrong_creds: 'Неверный логин или пароль'
   },
   en: {
@@ -239,7 +267,7 @@ const T = {
     task: 'Task', note: 'Note', alert: 'Notification',
     branch: 'Branch', staff: 'Staff', reply: 'Reply',
     late: 'Late', on_time: 'On time', no_data: 'No data',
-    saved: '✓ Saved', deleted: '🗑 Deleted', error: 'An error occurred',
+    saved: 'Saved', deleted: 'Deleted', error: 'An error occurred',
     auth_sub: 'Learning Center Management System', wrong_creds: 'Wrong login or password'
   }
 };
@@ -294,7 +322,7 @@ function toggleTheme() {
   const tog = document.getElementById('theme-toggle');
   if (tog) tog.classList.toggle('on', goingDark);
   const tb = document.getElementById('btn-theme');
-  if (tb) tb.textContent = goingDark ? '☀' : '🌙';
+  if (tb) tb.innerHTML = ic(goingDark ? 'sun' : 'moon');
 }
 function initTheme() {
   const saved = localStorage.getItem('theme');
@@ -303,11 +331,11 @@ function initTheme() {
   if (saved === 'dark') {
     document.body.classList.add('dark');
     if (tog) tog.classList.add('on');
-    if (tb) tb.textContent = '☀';
+    if (tb) tb.innerHTML = ic('sun');
   } else {
     document.body.classList.remove('dark');
     if (tog) tog.classList.remove('on');
-    if (tb) tb.textContent = '🌙';
+    if (tb) tb.innerHTML = ic('moon');
   }
 }
 
@@ -317,7 +345,7 @@ function toggleNotif() {
   localStorage.setItem('notifEnabled', notifEnabled ? '1' : '0');
   if (notifEnabled && 'Notification' in window && Notification.permission === 'default') {
     Notification.requestPermission().then(p => {
-      if (p === 'granted') showToast('Bildirishnomalar yoqildi ✓', 1800, 'ok');
+      if (p === 'granted') showToast('Bildirishnomalar yoqildi', 1800, 'ok');
     });
   }
 }
@@ -326,9 +354,10 @@ function toggleNotif() {
 // TOAST
 // ============================================================
 let _toastTimer = null;
-function showToast(msg, dur = 2000, kind = '') {
+const TOAST_ICONS = { ok: 'check-circle', warn: 'alert-triangle' };
+function showToast(msg, dur = 2000, kind = '', icon) {
   const el = document.getElementById('toast');
-  el.textContent = msg;
+  el.innerHTML = ic(icon || TOAST_ICONS[kind] || 'info') + `<span>${esc(noEmoji(msg))}</span>`;
   el.classList.remove('warn', 'ok');
   if (kind) el.classList.add(kind);
   el.classList.add('show');
@@ -553,7 +582,7 @@ function updateProfileDisplay() {
 // Bo'lim (sahifa) ruxsatlari
 const PAGE_ACCESS = {
   dashboard: () => canAny('dashboard', 'dashboard_late', 'dashboard_absent', 'dashboard_penalties'),
-  attendance: () => canAny('attendance', 'attendance_edit', 'reports', 'attendance_permit'),
+  attendance: () => canAny('attendance', 'attendance_edit', 'reports', 'attendance_permit', 'attendance_delete'),
   tasks: () => !isAdminUser() || canAny('tasks_view', 'tasks_manage'),
   admin: () => isSuper() || canAny('staff_view', 'staff_manage', 'branches', 'penalty_settings', 'staff_freeze'),
   myattend: () => !isAdminUser(),
@@ -572,7 +601,7 @@ function setupUI(keepPage) {
   // Bo'lim ichidagi elementlar
   show('btn-add-task', can('tasks_manage'));
   show('btn-add-checkin', can('attendance_edit'));
-  show('att-tab-checkin', canAny('attendance', 'attendance_edit'));
+  show('att-tab-checkin', canAny('attendance', 'attendance_edit', 'attendance_delete'));
   show('att-tab-report', can('reports'));
   show('att-tab-late', can('attendance'));
   show('att-tab-issues', can('attendance'));
@@ -724,11 +753,11 @@ function updateTasksBadge() {
 // Yangi vazifa bildirishnomasi
 function notifyNewTask(task) {
   const typeLabel = { task: 'Yangi vazifa', note: 'Yangi eslatma', alert: 'Yangi xabarnoma', fine: 'Jarima', discipline: 'Intizomiy bildirishnoma' }[task.type] || 'Yangi vazifa';
-  showToast(`📬 ${typeLabel}: ${task.title}`, 4000, 'ok');
+  showToast(`${typeLabel}: ${noEmoji(task.title)}`, 4000, 'ok', 'inbox');
   if (!notifEnabled) return;
   // Bildirishnoma — service worker orqali (ishonchliroq, mobil fonда ham)
   if ('Notification' in window && Notification.permission === 'granted') {
-    const opts = { body: task.title, icon: './icon-192.png', badge: './icon-192.png', vibrate: [100, 50, 100], tag: 'task-' + task.id };
+    const opts = { body: noEmoji(task.title), icon: './icon-192.png', badge: './icon-192.png', vibrate: [100, 50, 100], tag: 'task-' + task.id };
     if ('serviceWorker' in navigator && navigator.serviceWorker.ready) {
       navigator.serviceWorker.ready.then(reg => reg.showNotification(typeLabel, opts)).catch(() => {
         try { new Notification(typeLabel, opts); } catch (e) { }
@@ -849,7 +878,7 @@ function pickShift(candidates) {
           ? `<span style="color:var(--green);font-size:12px;">${c.earlyMin} min oldin</span>`
           : `<span style="color:var(--green);font-size:12px;">Vaqtida</span>`;
       return `<button class="btn btn-secondary btn-full" style="margin-bottom:10px;justify-content:space-between;" data-idx="${i}">
-    <span>🕐 ${esc(c.shift.label)}</span>${statusTxt}
+    <span>${ic('clock')} ${esc(c.shift.label)}</span>${statusTxt}
   </button>`;
     }).join('');
     box.querySelectorAll('button').forEach(btnEl => {
@@ -875,7 +904,7 @@ function pickBranch(matches) {
     const box = document.getElementById('branch-pick-list');
     box.innerHTML = matches.map(m =>
       `<button class="btn btn-secondary btn-full" style="margin-bottom:10px;justify-content:space-between;" data-bid="${esc(m.branch.id)}">
-    <span>🏢 ${esc(m.branch.name)}</span>
+    <span>${ic('building')} ${esc(m.branch.name)}</span>
     <span style="font-size:12px;color:var(--text2);">~${m.dist}m</span>
   </button>`
     ).join('');
@@ -933,16 +962,16 @@ function motivationalMessage(type, lateMin, earlyMin) {
   let msg, dur = 3000, kind = 'ok';
   if (type === 'checkin') {
     const rahmat = [
-      `Xush kelibsiz! Davomat qayd etildi 🌟`,
-      `Keldingiz qayd etildi. Samarali ish kuni tilaymiz ☀️`,
-      `Xush kelibsiz — barakali ish kuni bo'lsin! 💚`
+      `Xush kelibsiz! Davomat qayd etildi`,
+      `Keldingiz qayd etildi. Samarali ish kuni tilaymiz`,
+      `Xush kelibsiz — barakali ish kuni bo'lsin!`
     ];
     msg = rahmat[Math.floor(Math.random() * rahmat.length)];
   } else {
     const yakun = [
-      `Bugungi mehnatingiz uchun rahmat! Yaxshi dam oling 🙌`,
-      `Ish kuni yakunlandi. Zo'r ishladingiz, rahmat! 👏`,
-      `Mehnatingiz uchun tashakkur. Ko'rishguncha! 👋`
+      `Bugungi mehnatingiz uchun rahmat! Yaxshi dam oling`,
+      `Ish kuni yakunlandi. Zo'r ishladingiz, rahmat!`,
+      `Mehnatingiz uchun tashakkur. Ko'rishguncha!`
     ];
     msg = yakun[Math.floor(Math.random() * yakun.length)];
   }
@@ -959,10 +988,10 @@ async function grabBranchLocation(btn) {
     const c = await getPosition();
     document.getElementById('br-lat').value = c.latitude.toFixed(6);
     document.getElementById('br-lng').value = c.longitude.toFixed(6);
-    status.textContent = `✓ Olindi (aniqlik: ±${Math.round(c.accuracy)}m)`;
+    status.innerHTML = `${ic('check')} Olindi (aniqlik: ±${Math.round(c.accuracy)}m)`;
     status.style.color = 'var(--accent)';
   } catch (e) {
-    status.textContent = '✕ ' + geoErrorMessage(e);
+    status.innerHTML = ic('x') + ' ' + esc(geoErrorMessage(e));
     status.style.color = 'var(--red)';
   } finally {
     restore();
@@ -1044,7 +1073,7 @@ async function refreshMyAttendance() {
     const pm = must(await sb.from('attendance_permits').select('allowed_until, comment')
       .eq('staff_id', currentUser.id).eq('permit_date', n.dateStr).eq('cancelled', false).maybeSingle());
     if (pm && pb) {
-      pb.textContent = `🕘 Bugun sizga ${String(pm.allowed_until).slice(0, 5)} gacha kelishga ruxsat berilgan. Izoh: ${pm.comment}`;
+      pb.innerHTML = `${ic('clock')} Bugun sizga ${esc(String(pm.allowed_until).slice(0, 5))} gacha kelishga ruxsat berilgan. Izoh: ${esc(pm.comment)}`;
       pb.style.display = '';
     } else if (pb) pb.style.display = 'none';
   } catch (e) { if (pb) pb.style.display = 'none'; }
@@ -1066,9 +1095,9 @@ function renderMyToday() {
 
   // Holat matni
   if (session) {
-    outBtn.innerHTML = `⬇ Ketdim — ${esc(session.branch_name || '')}`;
+    outBtn.innerHTML = `${ic('log-out')} Ketdim — ${esc(session.branch_name || '')}`;
   } else {
-    outBtn.innerHTML = '⬇ Ketdim';
+    outBtn.innerHTML = ic('log-out') + ' Ketdim';
   }
 
   // Fokusni faol (bosilishi mumkin) tugmaga qaratish
@@ -1084,12 +1113,12 @@ function renderMyToday() {
       banner.style.display = '';
       banner.style.background = 'rgba(79,184,154,0.16)';
       banner.style.color = 'var(--green)';
-      banner.textContent = `🟢 Ish vaqtidasiz — ${session.branch_name || ''}`;
+      banner.innerHTML = `<span class="dot dot-green"></span>Ish vaqtidasiz — ${esc(session.branch_name || '')}`;
     } else if (myTodayRecords.length) {
       banner.style.display = '';
       banner.style.background = 'var(--inset-bg)';
       banner.style.color = 'var(--text2)';
-      banner.textContent = '⚪ Hozir ish vaqtida emassiz';
+      banner.innerHTML = '<span class="dot dot-gray"></span>Hozir ish vaqtida emassiz';
     } else {
       banner.style.display = 'none';
     }
@@ -1103,10 +1132,10 @@ function renderMyToday() {
     const isIn = r.type === 'checkin';
     const autoClosed = r.auto_closed;
     return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;">
-  <span style="font-weight:600;">${isIn ? '⬆ Keldim' : '⬇ Ketdim'}${r.branch_name ? ` <span style="color:var(--text2);font-weight:400;font-size:12px;">• ${esc(r.branch_name)}</span>` : ''}</span>
+  <span style="font-weight:600;">${isIn ? ic('log-in') + ' Keldim' : ic('log-out') + ' Ketdim'}${r.branch_name ? ` <span style="color:var(--text2);font-weight:400;font-size:12px;">• ${esc(r.branch_name)}</span>` : ''}</span>
   <span style="display:flex;gap:6px;align-items:center;">
     <span class="time-badge">${hm}</span>
-    ${autoClosed ? `<span class="late-badge" title="Avtomatik yopilgan">⚠ Tugatmagan</span>` : ''}
+    ${autoClosed ? `<span class="late-badge" title="Avtomatik yopilgan">${ic('alert-triangle')} Tugatmagan</span>` : ''}
   </span>
 </div>`;
   }).join('');
@@ -1127,10 +1156,13 @@ async function autoCloseStaleSession() {
 }
 
 // Yo'qolmaydigan eslatma modali (close tugmali)
-function infoModal(title, text, icon) {
-  document.getElementById('info-title').textContent = title || 'Eslatma';
-  document.getElementById('info-text').textContent = text || '';
-  document.getElementById('info-icon').textContent = icon || '⏰';
+// icon — ikonka nomi (ic()); rich — matn tizim bildirishnomasi (qatorlar ikonkalar bilan)
+function infoModal(title, text, icon, rich) {
+  document.getElementById('info-title').textContent = noEmoji(title) || 'Eslatma';
+  const body = document.getElementById('info-text');
+  if (rich) { body.innerHTML = richText(text); body.style.textAlign = 'left'; }
+  else { body.textContent = text || ''; body.style.textAlign = ''; }
+  document.getElementById('info-icon').innerHTML = ic(icon || 'clock', 'ic-xl');
   openModal('modal-info');
 }
 
@@ -1242,7 +1274,7 @@ async function myCheck(type) {
         // Aniq sabab: GPS'li filial bormi? Eng yaqini necha metr?
         const withGps = branches.filter(b => b.lat != null && b.lng != null);
         if (!withGps.length) {
-          infoModal('GPS o\'rnatilmagan', 'Hech qaysi filialga joylashuv (GPS) o\'rnatilmagan. Iltimos, administrator bilan bog\'laning — u filialga joylashuvni qo\'shishi kerak.', '📍');
+          infoModal('GPS o\'rnatilmagan', 'Hech qaysi filialga joylashuv (GPS) o\'rnatilmagan. Iltimos, administrator bilan bog\'laning — u filialga joylashuvni qo\'shishi kerak.', 'map-pin');
         } else {
           let nearest = Infinity;
           withGps.forEach(b => {
@@ -1250,7 +1282,7 @@ async function myCheck(type) {
             if (d < nearest) nearest = d;
           });
           infoModal('Filial hududida emassiz',
-            `Siz hech qaysi filial hududida emassiz, shuning uchun davomat qabul qilinmadi.\n\nEng yaqin filial ~${Math.round(nearest)} metr uzoqda (ruxsat etilgan masofa: ${GEOFENCE_DEFAULT_RADIUS} metr).\n\nIltimos, filial hududiga kiring va qayta urinib ko'ring.`, '📍');
+            `Siz hech qaysi filial hududida emassiz, shuning uchun davomat qabul qilinmadi.\n\nEng yaqin filial ~${Math.round(nearest)} metr uzoqda (ruxsat etilgan masofa: ${GEOFENCE_DEFAULT_RADIUS} metr).\n\nIltimos, filial hududiga kiring va qayta urinib ko'ring.`, 'map-pin');
         }
         return;
       }
@@ -1396,15 +1428,15 @@ function issuesHtml({ notCome, notClosed }) {
   <span style="font-size:12px;color:var(--text2);">${right}</span>
 </div>`;
   const head = (icon, color, title, n) => `<div style="font-weight:700;font-size:14px;margin-bottom:12px;display:flex;align-items:center;gap:8px;">
-  <span style="color:${color};">${icon}</span> ${title} <span style="color:var(--text3);font-weight:400;">(${n})</span>
+  <span style="color:${color};display:inline-flex;">${ic(icon)}</span> ${title} <span style="color:var(--text3);font-weight:400;">(${n})</span>
 </div>`;
-  const none = txt => `<div style="font-size:13px;color:var(--text3);padding:6px 0;">${txt}</div>`;
-  return `<div class="card" style="margin-bottom:14px;">${head('❌', 'var(--red)', 'Kelmaganlar', notCome.length)}${notCome.length
+  const none = txt => `<div style="font-size:13px;color:var(--text3);padding:6px 0;display:flex;align-items:center;gap:6px;">${ic('check-circle')} ${txt}</div>`;
+  return `<div class="card" style="margin-bottom:14px;">${head('x-circle', 'var(--red)', 'Kelmaganlar', notCome.length)}${notCome.length
       ? notCome.map(x => row(esc(x.name), esc(x.shifts.map(s => s.start + (s.end ? '–' + s.end : '')).join(', ')))).join('')
-      : none('Kelmaganlar yo\'q ✓')}</div>
-<div class="card">${head('⚠️', 'var(--yellow)', 'Ketdim qilmaganlar', notClosed.length)}${notClosed.length
+      : none('Kelmaganlar yo\'q')}</div>
+<div class="card">${head('alert-triangle', 'var(--yellow)', 'Ketdim qilmaganlar', notClosed.length)}${notClosed.length
       ? notClosed.map(x => row(esc(x.name), `Keldi: ${pad2(x.checkinTime.hour)}:${pad2(x.checkinTime.minute)} • Ketdim yo'q`)).join('')
-      : none('Hammasi Ketdim qilgan ✓')}</div>`;
+      : none('Hammasi Ketdim qilgan')}</div>`;
 }
 
 async function renderIssues() {
@@ -1424,7 +1456,7 @@ async function renderIssues() {
 // DAVOMAT DASHBOARD — har bir blok alohida ruxsat bilan
 // ============================================================
 const LEVEL_LABELS = { notice: 'Bildirishnoma', warning: 'Ogohlantirish', reprimand: 'Tanbeh', severe: 'Qattiq tanbeh' };
-const LEVEL_ICONS = { notice: '🔔', warning: '⚠️', reprimand: '❗', severe: '⛔' };
+const LEVEL_ICONS = { notice: 'bell', warning: 'alert-triangle', reprimand: 'alert-circle', severe: 'ban' };
 const MONTHS_UZ = ['Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun', 'Iyul', 'Avgust', 'Sentyabr', 'Oktyabr', 'Noyabr', 'Dekabr'];
 
 // Soniyalarni "1 soat 5 daqiqa 3 soniya" ko'rinishiga o'tkazish
@@ -1490,14 +1522,14 @@ async function renderDashboard() {
 
     if (showLate) {
       const rows = lateRecs.slice().sort((a, b) => lateSecOf(b) - lateSecOf(a));
-      document.getElementById('dash-late-card').innerHTML = `<div style="font-weight:700;font-size:14px;margin-bottom:12px;">⏰ Kechikkanlar <span style="color:var(--text3);font-weight:400;">(${rows.length})</span></div>`
+      document.getElementById('dash-late-card').innerHTML = `<div style="font-weight:700;font-size:14px;margin-bottom:12px;display:flex;align-items:center;gap:6px;">${ic('clock')} Kechikkanlar <span style="color:var(--text3);font-weight:400;">(${rows.length})</span></div>`
         + (rows.length ? rows.map(r => `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--glass-border);">
   <div style="min-width:0;">
     <div style="font-weight:600;">${esc(r.staff_name || '-')}</div>
     <div style="font-size:12px;color:var(--text2);">${esc(r.branch_name || '')} • Keldi: ${fmtUzTime(r.time)}</div>
   </div>
   <span class="late-badge" style="flex-shrink:0;">+${fmtLate(lateSecOf(r))}</span>
-</div>`).join('') : `<div style="font-size:13px;color:var(--text3);padding:6px 0;">Kechikkanlar yo'q ✓</div>`);
+</div>`).join('') : `<div style="font-size:13px;color:var(--text3);padding:6px 0;">${ic('check-circle')} Kechikkanlar yo'q</div>`);
     }
 
     if (showAbsent) document.getElementById('dash-absent-card').innerHTML = issuesHtml(issues);
@@ -1534,7 +1566,7 @@ function renderDashPenalties(allPens, dateStr) {
   const cell = 'padding:8px 4px;border-bottom:1px solid var(--card-border);';
 
   document.getElementById('dash-pen-card').innerHTML = `
-<div style="font-weight:700;font-size:14px;margin-bottom:12px;">💰 Jarima va intizom — ${MONTHS_UZ[m - 1]} ${y}</div>
+<div style="font-weight:700;font-size:14px;margin-bottom:12px;display:flex;align-items:center;gap:6px;">${ic('banknote')} Jarima va intizom — ${MONTHS_UZ[m - 1]} ${y}</div>
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
   <div style="text-align:center;padding:10px;border-radius:12px;background:var(--inset-bg);box-shadow:var(--shadow-in);">
     <div style="font-size:16px;font-weight:800;color:var(--red);">${sumByCur(fines)}</div>
@@ -1546,7 +1578,7 @@ function renderDashPenalties(allPens, dateStr) {
   </div>
 </div>
 <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;">
-  ${levelCounts.map(([l, n]) => `<span class="tag tag-yellow">${LEVEL_ICONS[l]} ${LEVEL_LABELS[l]}: ${n}</span>`).join('')}
+  ${levelCounts.map(([l, n]) => `<span class="tag tag-yellow">${ic(LEVEL_ICONS[l])} ${LEVEL_LABELS[l]}: ${n}</span>`).join('')}
 </div>
 ${staffRows.length ? `<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;">
   <thead><tr style="color:var(--text2);">
@@ -1561,18 +1593,18 @@ ${staffRows.length ? `<div style="overflow-x:auto;"><table style="width:100%;bor
     <td style="${cell}text-align:right;">${s.days.size}</td>
     <td style="${cell}text-align:right;">${fmtLate(s.sec)}</td>
     <td style="${cell}text-align:right;">${s.fines.length ? sumByCur(s.fines) : '—'}</td>
-    <td style="${cell}">${Object.entries(s.levels).map(([l, n]) => `${LEVEL_ICONS[l]}${n}`).join(' ') || '—'}</td>
+    <td style="${cell}">${Object.entries(s.levels).map(([l, n]) => `${ic(LEVEL_ICONS[l])}${n}`).join(' ') || '—'}</td>
   </tr>`).join('')}</tbody>
-</table></div>` : `<div style="font-size:13px;color:var(--text3);padding:6px 0;">Bu oyda jarima va intizomiy choralar yo'q ✓</div>`}
+</table></div>` : `<div style="font-size:13px;color:var(--text3);padding:6px 0;">${ic('check-circle')} Bu oyda jarima va intizomiy choralar yo'q</div>`}
 ${allPens.length ? `<details style="margin-top:12px;"${can('penalty_cancel') ? ' open' : ''}>
-  <summary style="cursor:pointer;font-weight:700;font-size:13px;margin-bottom:8px;">📄 Barcha yozuvlar (${allPens.length})</summary>
+  <summary style="cursor:pointer;font-weight:700;font-size:13px;margin-bottom:8px;">${ic('file-text')} Barcha yozuvlar (${allPens.length})</summary>
   ${allPens.map(penaltyRowHtml).join('')}
 </details>` : ''}`;
 }
 
 function penaltyWhat(p) {
-  if (p.kind === 'fine') return `💰 ${fmtMoney(p.amount)} ${esc(p.currency || '')}${p.level ? ' · ' + LEVEL_LABELS[p.level] : ''}`;
-  return `${LEVEL_ICONS[p.level] || '⚖️'} ${LEVEL_LABELS[p.level] || 'Intizom'}`;
+  if (p.kind === 'fine') return `${ic('banknote')} ${fmtMoney(p.amount)} ${esc(p.currency || '')}${p.level ? ' · ' + LEVEL_LABELS[p.level] : ''}`;
+  return `${ic(LEVEL_ICONS[p.level] || 'scale')} ${LEVEL_LABELS[p.level] || 'Intizom'}`;
 }
 
 function penaltyRowHtml(p) {
@@ -1580,10 +1612,53 @@ function penaltyRowHtml(p) {
   <div style="min-width:0;">
     <div style="font-weight:600;${p.cancelled ? 'text-decoration:line-through;' : ''}">${esc(p.staff_name || '-')} — ${penaltyWhat(p)}</div>
     <div style="font-size:11px;color:var(--text2);">${fmtUzDateTime(p.late_at)} • +${fmtLate(p.late_seconds)}</div>
-    ${p.cancelled ? `<div style="font-size:11px;color:var(--text3);">❌ Bekor qilingan: ${esc(p.cancelled_by || '')}${p.cancelled_at ? ', ' + fmtUzDateTime(p.cancelled_at) : ''} — ${esc(p.cancel_reason || '')}</div>` : ''}
+    ${p.cancelled ? `<div style="font-size:11px;color:var(--text3);">${ic('x-circle')} Bekor qilingan: ${esc(p.cancelled_by || '')}${p.cancelled_at ? ', ' + fmtUzDateTime(p.cancelled_at) : ''} — ${esc(p.cancel_reason || '')}</div>` : ''}
   </div>
   ${!p.cancelled && can('penalty_cancel') ? `<button class="btn btn-sm btn-danger" style="flex-shrink:0;" onclick="openCancelPenalty('${esc(p.id)}')">Bekor qilish</button>` : ''}
 </div>`;
+}
+
+// ============================================================
+// DAVOMATNI O'CHIRISH ("attendance_delete" ruxsati, izoh majburiy)
+// ============================================================
+let _deleteAtt = null;
+
+function deleteAttButton(a) {
+  if (!can('attendance_delete')) return '';
+  return `<button class="btn btn-sm btn-danger btn-icon" style="padding:2px 8px;min-height:0;font-size:12px;" title="Yozuvni o'chirish" onclick="openDeleteAttendance('${esc(a.id)}')">${ic('trash')}</button>`;
+}
+
+function openDeleteAttendance(id) {
+  const a = attendances.find(x => x.id === id) || _lastReportData.find(x => x.id === id);
+  if (!a) return;
+  _deleteAtt = a;
+  document.getElementById('da-info').innerHTML = `<b>${esc(a.staff_name || '-')}</b>\n`
+    + `${a.type === 'checkin' ? ic('log-in') + ' Keldi' : ic('log-out') + ' Ketdi'} — ${fmtUzDateTime(a.time)}${a.branch_name ? ' • ' + esc(a.branch_name) : ''}`
+    + (a.late_minutes > 0 ? `\n${ic('timer')} Kechikish: ${fmtDuration(a.late_minutes)} (jarimasi bekor qilinadi)` : '');
+  document.getElementById('da-reason').value = '';
+  openModal('modal-delete-att');
+  setTimeout(() => document.getElementById('da-reason').focus(), 200);
+}
+
+async function confirmDeleteAttendance(btn) {
+  const reason = document.getElementById('da-reason').value.trim();
+  if (!reason) { showToast('O\'chirish sababini yozing (majburiy)', 3000); document.getElementById('da-reason').focus(); return; }
+  if (!_deleteAtt) return;
+  const restore = btnLoading(btn);
+  let res = null;
+  const ok = await run(t('del') + '...', async () => {
+    res = must(await sb.rpc('delete_attendance', { p_id: _deleteAtt.id, p_reason: reason }));
+  });
+  restore();
+  if (!ok) return;
+  closeModal('modal-delete-att');
+  _deleteAtt = null;
+  showToast(res && res.penalty_cancelled ? 'Yozuv o\'chirildi, jarima bekor qilindi' : 'Yozuv o\'chirildi', 2500, 'ok');
+  // Ochiq ro'yxatlarni yangilash
+  loadAttendance().catch(() => { });
+  if (!document.getElementById('att-report').classList.contains('hidden')) loadReport();
+  if (!document.getElementById('att-late').classList.contains('hidden')) loadLate().catch(() => { });
+  if (isAdminUser()) loadStaff().catch(() => { });
 }
 
 // ============================================================
@@ -1609,13 +1684,13 @@ async function renderPermits() {
     return `<div class="card" style="display:flex;align-items:center;gap:12px;${pm.cancelled ? 'opacity:0.55;' : ''}">
 <div style="flex:1;min-width:0;">
   <div style="font-weight:700;font-size:14px;${pm.cancelled ? 'text-decoration:line-through;' : ''}">${esc(pm.staff_name || '-')}</div>
-  <div style="font-size:12px;color:var(--text2);">📅 ${dd}.${m}.${y} • 🕘 ${esc(String(pm.allowed_until).slice(0, 5))} gacha</div>
-  <div style="font-size:12px;color:var(--text2);">📝 ${esc(pm.comment)}</div>
-  <div style="font-size:11px;color:var(--text3);">👤 ${esc(pm.created_by || '')}${pm.cancelled ? ` • ❌ bekor qilingan (${esc(pm.cancelled_by || '')})` : ''}</div>
+  <div style="font-size:12px;color:var(--text2);">${ic('calendar')} ${dd}.${m}.${y} • ${ic('clock')} ${esc(String(pm.allowed_until).slice(0, 5))} gacha</div>
+  <div style="font-size:12px;color:var(--text2);">${ic('file-text')} ${esc(pm.comment)}</div>
+  <div style="font-size:11px;color:var(--text3);">${ic('user')} ${esc(pm.created_by || '')}${pm.cancelled ? ` • ${ic('x-circle')} bekor qilingan (${esc(pm.cancelled_by || '')})` : ''}</div>
 </div>
 ${canCancel ? `<button class="btn btn-sm btn-danger" onclick="cancelPermit('${esc(pm.id)}')">Bekor</button>` : ''}
 </div>`;
-  }).join('') : `<div class="empty"><div class="empty-icon">🕘</div><h3>Ruxsatlar yo'q</h3></div>`;
+  }).join('') : `<div class="empty"><div class="empty-icon">${ic('clock')}</div><h3>Ruxsatlar yo'q</h3></div>`;
 }
 
 function openPermitModal() {
@@ -1638,7 +1713,7 @@ function updatePermitHint() {
   if (!st || !date) { hint.textContent = ''; return; }
   const dow = uzParts(new Date(`${date}T12:00:00+05:00`)).dow;
   const shifts = parseShifts(st.shifts).filter(sh => sh && sh.start && (!sh.days || !sh.days.length || sh.days.some(d => Number(d) === dow)));
-  if (!shifts.length) { hint.innerHTML = `<span style="color:var(--red);">⚠ ${DOW_UZ[dow]} kuni bu xodimga smena belgilanmagan.</span>`; return; }
+  if (!shifts.length) { hint.innerHTML = `<span style="color:var(--red);">${ic('alert-triangle')} ${DOW_UZ[dow]} kuni bu xodimga smena belgilanmagan.</span>`; return; }
   const until = document.getElementById('pm-until').value;
   hint.textContent = `${DOW_UZ[dow]} kungi smena: ${shifts.map(s => s.start + (s.end ? '–' + s.end : '')).join(', ')}`
     + (until ? ` → ${until} gacha kelsa, kechikish hisoblanmaydi.` : '');
@@ -1659,7 +1734,7 @@ async function savePermit(btn) {
   restore();
   if (!ok) return;
   closeModal('modal-permit');
-  showToast(`✓ ${res.staff_name}: ${res.until} gacha ruxsat berildi${res.replaced ? ' (avvalgisi almashtirildi)' : ''}`, 3000, 'ok');
+  showToast(`${res.staff_name}: ${res.until} gacha ruxsat berildi${res.replaced ? ' (avvalgisi almashtirildi)' : ''}`, 3000, 'ok');
   renderPermits();
 }
 
@@ -1681,7 +1756,7 @@ function openCancelPenalty(id, penObj) {
   if (!p) return;
   if (p.cancelled) { showToast(SERVER_ERRORS.ALREADY_CANCELLED); return; }
   _cancelPenalty = p;
-  document.getElementById('cp-info').innerHTML = `<b>${esc(p.staff_name || '-')}</b>\n${penaltyWhat(p)}\n📅 ${fmtUzDateTime(p.late_at)} • ⏱ ${fmtLate(p.late_seconds)} kechikish`;
+  document.getElementById('cp-info').innerHTML = `<b>${esc(p.staff_name || '-')}</b>\n${penaltyWhat(p)}\n${ic('calendar')} ${fmtUzDateTime(p.late_at)} • ${ic('timer')} ${fmtLate(p.late_seconds)} kechikish`;
   document.getElementById('cp-reason').value = '';
   openModal('modal-cancel-penalty');
   setTimeout(() => document.getElementById('cp-reason').focus(), 200);
@@ -1711,7 +1786,7 @@ async function confirmCancelPenalty(btn) {
   if (!ok) return;
   closeModal('modal-cancel-penalty');
   _cancelPenalty = null;
-  showToast('✓ Jarima bekor qilindi, xodimga xabar yuborildi', 2500, 'ok');
+  showToast('Jarima bekor qilindi, xodimga xabar yuborildi', 2500, 'ok');
   loadTasks().catch(() => { });
   const active = document.querySelector('.page.active');
   if (active && active.id === 'page-dashboard') renderDashboard();
@@ -1719,7 +1794,7 @@ async function confirmCancelPenalty(btn) {
 
 // Xodimga kechikish natijasini ko'rsatish (jarima yoki intizomiy chora)
 function showPenaltyNotice(p) {
-  infoModal(p.title, p.body, p.kind === 'fine' ? '💰' : (LEVEL_ICONS[p.level] || '⚠️'));
+  infoModal(p.title, p.body, p.kind === 'fine' ? 'banknote' : (LEVEL_ICONS[p.level] || 'alert-triangle'), true);
 }
 
 function openCheckIn() {
@@ -1752,7 +1827,7 @@ async function saveCheckIn() {
   });
   if (!ok) return;
   if (result && result.freeze) {
-    infoModal('Xodim profili muzlatildi', result.freeze.message, '🧊');
+    infoModal('Xodim profili muzlatildi', result.freeze.message, 'snowflake');
     loadStaff().catch(() => { });
   } else {
     showToast(result && result.penalty ? `${t('saved')} · ${result.penalty.title}` : t('saved'), result && result.penalty ? 4500 : 2000);
@@ -1767,8 +1842,8 @@ function attendanceBadge(a) {
 // Qo'lda belgilangan / ruxsat bilan kelgan yozuvlar uchun izoh
 function attendanceNotes(a) {
   let html = '';
-  if (a.permit_until) html += `<div style="font-size:11px;color:var(--accent);margin-top:2px;" title="${esc(a.permit_comment || '')}">🕘 Ruxsat: ${esc(a.permit_until)} gacha</div>`;
-  if (a.manual) html += `<div style="font-size:11px;color:var(--text2);margin-top:2px;max-width:220px;text-align:right;">✍️ ${esc(a.manual_by || '')}: ${esc(a.manual_comment || '')}</div>`;
+  if (a.permit_until) html += `<div style="font-size:11px;color:var(--accent);margin-top:2px;" title="${esc(a.permit_comment || '')}">${ic('clock')} Ruxsat: ${esc(a.permit_until)} gacha</div>`;
+  if (a.manual) html += `<div style="font-size:11px;color:var(--text2);margin-top:2px;max-width:220px;text-align:right;">${ic('pen-line')} ${esc(a.manual_by || '')}: ${esc(a.manual_comment || '')}</div>`;
   return html;
 }
 function attendanceStatusBadge(a) {
@@ -1780,7 +1855,7 @@ function attendanceStatusBadge(a) {
 
 function renderTodayAttendance() {
   const el = document.getElementById('today-attendance');
-  if (!attendances.length) { el.innerHTML = `<div class="empty"><div class="empty-icon">📋</div><h3>${t('no_data')}</h3></div>`; return; }
+  if (!attendances.length) { el.innerHTML = `<div class="empty"><div class="empty-icon">${ic('clipboard')}</div><h3>${t('no_data')}</h3></div>`; return; }
   el.innerHTML = attendances.map(a => {
     const hm = fmtUzTime(a.time);
     return `<div class="shift-card">
@@ -1790,7 +1865,10 @@ function renderTodayAttendance() {
       <div style="font-size:12px;color:var(--text2);">${esc(a.branch_name || '')}</div>
     </div>
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
-      <span class="time-badge">${a.type === 'checkin' ? '⬆' : '⬇'} ${hm}</span>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span class="time-badge">${ic(a.type === 'checkin' ? 'log-in' : 'log-out')} ${hm}</span>
+        ${deleteAttButton(a)}
+      </div>
       ${attendanceBadge(a)}
     </div>
   </div>
@@ -1801,7 +1879,7 @@ function renderTodayAttendance() {
 function renderLate(data) {
   const late = data.filter(a => a.late_minutes > 0);
   const el = document.getElementById('late-list');
-  if (!late.length) { el.innerHTML = `<div class="empty"><div class="empty-icon">✅</div><h3>Kechikkanlar yo'q</h3></div>`; return; }
+  if (!late.length) { el.innerHTML = `<div class="empty"><div class="empty-icon">${ic('check-circle')}</div><h3>Kechikkanlar yo'q</h3></div>`; return; }
   el.innerHTML = late.map(a => {
     return `<div class="shift-card">
   <div class="shift-row">
@@ -1813,7 +1891,7 @@ function renderLate(data) {
   </div>
   ${(a.late_reason || a.late_comment) ? `<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--glass-border);">
     ${a.late_reason ? `<span class="tag tag-yellow">${esc(a.late_reason)}</span>` : ''}
-    ${a.late_comment ? `<div style="font-size:12px;color:var(--text2);margin-top:4px;">💬 ${esc(a.late_comment)}</div>` : ''}
+    ${a.late_comment ? `<div style="font-size:12px;color:var(--text2);margin-top:4px;">${ic('message')} ${esc(a.late_comment)}</div>` : ''}
   </div>` : ''}
 </div>`;
   }).join('');
@@ -1993,13 +2071,13 @@ function renderReportTable(data) {
     const timeStr = `${String(lp.hour).padStart(2, '0')}:${String(lp.minute).padStart(2, '0')}`;
     const reasonCell = (r.late_reason ? `<span class="tag tag-yellow">${esc(r.late_reason)}</span>` : '')
       + (r.late_comment ? `<div style="font-size:11px;color:var(--text2);margin-top:2px;">${esc(r.late_comment)}</div>` : '')
-      + (r.permit_until ? `<div style="font-size:11px;color:var(--accent);margin-top:2px;">🕘 Ruxsat ${esc(r.permit_until)} gacha: ${esc(r.permit_comment || '')}</div>` : '')
-      + (r.manual ? `<div style="font-size:11px;color:var(--text2);margin-top:2px;">✍️ Qo'lda (${esc(r.manual_by || '')}): ${esc(r.manual_comment || '')}</div>` : '');
+      + (r.permit_until ? `<div style="font-size:11px;color:var(--accent);margin-top:2px;">${ic('clock')} Ruxsat ${esc(r.permit_until)} gacha: ${esc(r.permit_comment || '')}</div>` : '')
+      + (r.manual ? `<div style="font-size:11px;color:var(--text2);margin-top:2px;">${ic('pen-line')} Qo'lda (${esc(r.manual_by || '')}): ${esc(r.manual_comment || '')}</div>` : '');
     return `<tr>
       <td style="padding:8px 4px;border-bottom:1px solid var(--card-border);font-weight:600;">${esc(r.staff_name || '-')}</td>
       <td style="padding:8px 4px;border-bottom:1px solid var(--card-border);color:var(--text2);">${dateStr}</td>
       <td style="padding:8px 4px;border-bottom:1px solid var(--card-border);font-weight:700;">${timeStr}</td>
-      <td style="padding:8px 4px;border-bottom:1px solid var(--card-border);">${r.type === 'checkin' ? '<span style="color:var(--green);">⬆ Keldi</span>' : '<span style="color:var(--text2);">⬇ Ketdi</span>'}${r.auto_closed ? ' <span style="color:var(--yellow);font-size:11px;">(avto)</span>' : ''}</td>
+      <td style="padding:8px 4px;border-bottom:1px solid var(--card-border);">${r.type === 'checkin' ? '<span style="color:var(--green);">' + ic('log-in') + ' Keldi</span>' : '<span style="color:var(--text2);">' + ic('log-out') + ' Ketdi</span>'}${r.auto_closed ? ' <span style="color:var(--yellow);font-size:11px;">(avto)</span>' : ''} ${deleteAttButton(r)}</td>
       <td style="padding:8px 4px;border-bottom:1px solid var(--card-border);text-align:right;">${r.late_minutes > 0 ? `<span class="late-badge">${fmtDuration(r.late_minutes)}</span>` : (r.type === 'checkin' && r.no_shift ? `<span style="font-size:11px;color:var(--yellow);">Smena yo'q</span>` : '')}</td>
       <td style="padding:8px 4px;border-bottom:1px solid var(--card-border);">${reasonCell}</td>
     </tr>`;
@@ -2113,30 +2191,33 @@ function exportExcelSessions() {
 // ============================================================
 // TASKS
 // ============================================================
+const TASK_ICONS = { task: 'clipboard', note: 'info', alert: 'bell', fine: 'banknote', discipline: 'scale' };
+const isSystemTask = task => task.type === 'fine' || task.type === 'discipline' || task.created_by === 'system';
+
 function renderTasks() {
   const el = document.getElementById('tasks-list');
-  if (!tasks.length) { el.innerHTML = `<div class="empty"><div class="empty-icon">📋</div><h3>${t('no_data')}</h3></div>`; return; }
+  if (!tasks.length) { el.innerHTML = `<div class="empty"><div class="empty-icon">${ic('clipboard')}</div><h3>${t('no_data')}</h3></div>`; return; }
   el.innerHTML = tasks.map(task => {
     const d = task.deadline ? new Date(task.deadline) : null;
     const isUrgent = d && d < new Date() && !task.done;
-    const typeLabel = { task: t('task'), note: t('note'), alert: t('alert'), fine: '💰 Jarima', discipline: '⚖️ Intizom' }[task.type] || task.type;
+    const typeLabel = { task: t('task'), note: t('note'), alert: t('alert'), fine: 'Jarima', discipline: 'Intizom' }[task.type] || task.type;
     const typeCls = { task: 'tag-blue', note: 'tag-blue', alert: 'tag-red', fine: 'tag-red', discipline: 'tag-yellow' }[task.type] || 'tag-blue';
     const created = task.created_at ? fmtUzDate(task.created_at) : '';
     const seen = seenTaskIds();
     const isNew = !seen.includes(task.id) && !task.done;
     return `<div class="task-card ${task.done ? 'done' : (isUrgent ? 'urgent' : 'normal')}" onclick="openTaskDetail('${esc(task.id)}')" style="${task.done ? 'opacity:0.6;' : ''}">
   <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
-    ${task.done ? `<span style="color:var(--green);flex-shrink:0;">✓</span>` : (isNew ? `<span style="width:8px;height:8px;border-radius:50%;background:var(--red);flex-shrink:0;"></span>` : '')}
-    <div style="font-size:14px;font-weight:700;${task.done ? 'text-decoration:line-through;' : ''}">${esc(task.title)}</div>
+    ${task.done ? `<span style="color:var(--green);flex-shrink:0;display:inline-flex;">${ic('check')}</span>` : (isNew ? `<span style="width:8px;height:8px;border-radius:50%;background:var(--red);flex-shrink:0;"></span>` : '')}
+    <div style="font-size:14px;font-weight:700;${task.done ? 'text-decoration:line-through;' : ''}">${esc(isSystemTask(task) ? noEmoji(task.title) : task.title)}</div>
   </div>
-  <div style="font-size:13px;color:var(--text2);margin-bottom:8px;">${esc((task.body || '').slice(0, 80))}${task.body && task.body.length > 80 ? '...' : ''}</div>
+  <div style="font-size:13px;color:var(--text2);margin-bottom:8px;">${(() => { const b = isSystemTask(task) ? noEmoji(task.body).replace(/\n+/g, ' · ') : (task.body || ''); return esc(b.slice(0, 80)) + (b.length > 80 ? '...' : ''); })()}</div>
   <div class="task-meta">
-    <span class="tag ${typeCls}">${esc(typeLabel)}</span>
-    ${task.assigned_name ? `<span class="tag tag-blue">👤 ${esc(task.assigned_name)}</span>` : ''}
-    ${d ? `<span class="tag ${isUrgent ? 'tag-red' : 'tag-yellow'}">⏰ ${fmtUzDate(d)}</span>` : ''}
-    ${task.done ? `<span class="tag" style="background:rgba(79,184,154,0.18);color:var(--green);">✓ Bajarilgan</span>` : ''}
+    <span class="tag ${typeCls}">${ic(TASK_ICONS[task.type] || 'clipboard')} ${esc(typeLabel)}</span>
+    ${task.assigned_name ? `<span class="tag tag-blue">${ic('user')} ${esc(task.assigned_name)}</span>` : ''}
+    ${d ? `<span class="tag ${isUrgent ? 'tag-red' : 'tag-yellow'}">${ic('clock')} ${fmtUzDate(d)}</span>` : ''}
+    ${task.done ? `<span class="tag" style="background:rgba(79,184,154,0.18);color:var(--green);">${ic('check')} Bajarilgan</span>` : ''}
   </div>
-  <div style="font-size:11px;color:var(--text3);margin-top:8px;">📅 Berilgan: ${created}</div>
+  <div style="font-size:11px;color:var(--text3);margin-top:8px;">${ic('calendar')} Berilgan: ${created}</div>
 </div>`;
   }).join('');
 }
@@ -2201,11 +2282,13 @@ function openTaskDetail(id) {
   const isSystem = task.type === 'fine' || task.type === 'discipline'; // avtomatik jarima / intizom bildirishnomasi
   document.getElementById('task-detail-content').innerHTML = `
 <div style="margin-bottom:16px;">
-  ${task.done ? `<div class="tag" style="background:rgba(79,184,154,0.18);color:var(--green);display:inline-block;margin-bottom:8px;">✓ Bajarilgan</div>` : ''}
-  <div style="font-size:18px;font-weight:700;margin-bottom:8px;">${esc(task.title)}</div>
-  <div style="font-size:14px;color:var(--text2);margin-bottom:12px;white-space:pre-wrap;">${esc(task.body || '')}</div>
-  ${task.assigned_name ? `<div class="tag tag-blue" style="display:inline-block;margin-bottom:8px;">👤 ${esc(task.assigned_name)}</div>` : ''}
-  ${d ? `<div class="tag tag-yellow" style="display:inline-block;margin-bottom:8px;">⏰ Muddat: ${fmtUzDateTime(d)}</div>` : ''}
+  ${task.done ? `<div class="tag" style="background:rgba(79,184,154,0.18);color:var(--green);display:inline-block;margin-bottom:8px;">${ic('check')} Bajarilgan</div>` : ''}
+  <div style="font-size:18px;font-weight:700;margin-bottom:8px;">${esc(isSystemTask(task) ? noEmoji(task.title) : task.title)}</div>
+  ${isSystemTask(task)
+    ? `<div style="font-size:14px;color:var(--text2);margin-bottom:12px;">${richText(task.body)}</div>`
+    : `<div style="font-size:14px;color:var(--text2);margin-bottom:12px;white-space:pre-wrap;">${esc(task.body || '')}</div>`}
+  ${task.assigned_name ? `<div class="tag tag-blue" style="display:inline-block;margin-bottom:8px;">${ic('user')} ${esc(task.assigned_name)}</div>` : ''}
+  ${d ? `<div class="tag tag-yellow" style="display:inline-block;margin-bottom:8px;">${ic('clock')} Muddat: ${fmtUzDateTime(d)}</div>` : ''}
   ${replies.length ? `<div style="margin-top:12px;"><div style="font-size:12px;color:var(--text2);margin-bottom:8px;">Javoblar:</div>${replies.map(r => `<div class="reply-box"><div class="reply-from">${esc(r.from)}</div><div class="reply-item">${esc(r.text)}</div></div>`).join('')}</div>` : ''}
 </div>`;
 
@@ -2214,20 +2297,20 @@ function openTaskDetail(id) {
   let html = '';
   // Bajarildi/qaytarish — hamma (jumladan tayinlangan xodim)
   if (task.done) {
-    html += `<button class="btn btn-secondary btn-full" onclick="toggleTaskDone(false)" style="margin-bottom:8px;">↩️ ${isSystem ? 'Tanishilmagan' : 'Bajarilmagan'} deb belgilash</button>`;
+    html += `<button class="btn btn-secondary btn-full" onclick="toggleTaskDone(false)" style="margin-bottom:8px;">${ic('undo')} ${isSystem ? 'Tanishilmagan' : 'Bajarilmagan'} deb belgilash</button>`;
   } else {
-    html += `<button class="btn btn-primary btn-full" onclick="toggleTaskDone(true)" style="margin-bottom:8px;">✓ ${isSystem ? 'Tanishdim' : 'Bajarildi'}</button>`;
+    html += `<button class="btn btn-primary btn-full" onclick="toggleTaskDone(true)" style="margin-bottom:8px;">${ic('check')} ${isSystem ? 'Tanishdim' : 'Bajarildi'}</button>`;
   }
   // Jarima / intizom bildirishnomasi — "penalty_cancel" ruxsati bilan bekor qilish
-  const isCancelNotice = /^(❌ Bekor qilingan|✅ )/.test(task.title || '');
+  const isCancelNotice = /^Bekor qilingan|bekor qilindi$/.test(noEmoji(task.title));
   if (isSystem && !isCancelNotice && can('penalty_cancel')) {
-    html += `<button class="btn btn-danger btn-full" onclick="cancelPenaltyFromTask('${esc(task.id)}')" style="margin-bottom:8px;">❌ ${task.type === 'fine' ? 'Jarimani' : 'Chorani'} bekor qilish</button>`;
+    html += `<button class="btn btn-danger btn-full" onclick="cancelPenaltyFromTask('${esc(task.id)}')" style="margin-bottom:8px;">${ic('x-circle')} ${task.type === 'fine' ? 'Jarimani' : 'Chorani'} bekor qilish</button>`;
   }
   // Tahrirlash/o'chirish — "tasks_manage" ruxsati bilan; avtomatik bildirishnomalar tahrirlanmaydi
   if (can('tasks_manage')) {
     html += `<div style="display:flex;gap:8px;">
-  ${isSystem ? '' : `<button class="btn btn-secondary" onclick="editTask()" style="flex:1;">✏️ Tahrirlash</button>`}
-  <button class="btn btn-danger" onclick="deleteTask()" style="flex:1;">🗑 O'chirish</button>
+  ${isSystem ? '' : `<button class="btn btn-secondary" onclick="editTask()" style="flex:1;">${ic('pencil')} Tahrirlash</button>`}
+  <button class="btn btn-danger" onclick="deleteTask()" style="flex:1;">${ic('trash')} O'chirish</button>
 </div>`;
   }
   actions.innerHTML = html;
@@ -2245,7 +2328,7 @@ async function toggleTaskDone(done) {
     await loadTasks();
   });
   if (!ok) return;
-  showToast(done ? '✓ Bajarildi deb belgilandi' : 'Qaytarildi', 1500, done ? 'ok' : '');
+  showToast(done ? 'Bajarildi deb belgilandi' : 'Qaytarildi', 1500, done ? 'ok' : '');
   closeModal('modal-task-detail');
 }
 
@@ -2314,7 +2397,7 @@ function switchAdminTab(tab) {
 // TAGS (Sabab teglari — Super Admin)
 // ============================================================
 const TAG_KINDS = [
-  { kind: 'late', label: '⏰ Kechikish sabablari' }
+  { kind: 'late', label: 'Kechikish sabablari' }
 ];
 
 // ============================================================
@@ -2369,9 +2452,9 @@ function updatePenaltyHints() {
   document.getElementById('pen-example').textContent =
     `Masalan: ${fmtLate(sample)} kechiksa → ${units} ${UNIT_LABELS[f.unit] || ''} × ${fmtMoney(amt)} ${f.currency} = ${fmtMoney(units * amt)} ${f.currency}`;
   const err = penaltyFormError(f);
-  document.getElementById('pen-levels').textContent = err && /Chegara/.test(err) ? '⚠ ' + err
-    : `1–${f.warning_from - 1} daq: 🔔 Bildirishnoma · ${f.warning_from}–${f.reprimand_from - 1}: ⚠️ Ogohlantirish · `
-    + `${f.reprimand_from}–${f.severe_from - 1}: ❗ Tanbeh · ${f.severe_from}+: ⛔ Qattiq tanbeh`;
+  document.getElementById('pen-levels').innerHTML = err && /Chegara/.test(err) ? ic('alert-triangle') + ' ' + esc(err)
+    : `1–${f.warning_from - 1} daq: ${ic('bell')} Bildirishnoma · ${f.warning_from}–${f.reprimand_from - 1}: ${ic('alert-triangle')} Ogohlantirish · `
+    + `${f.reprimand_from}–${f.severe_from - 1}: ${ic('alert-circle')} Tanbeh · ${f.severe_from}+: ${ic('ban')} Qattiq tanbeh`;
 }
 
 async function savePenaltySettings() {
@@ -2393,7 +2476,7 @@ function renderTags() {
     const list = tagsByKind(k.kind);
     const chips = list.length
       ? list.map(tg => `<span class="branch-chip" style="cursor:default;">${esc(tg.label)}
-      <button onclick="deleteTag('${esc(tg.id)}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-weight:700;margin-left:2px;">✕</button>
+      <button onclick="deleteTag('${esc(tg.id)}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-weight:700;margin-left:2px;">${ic('x')}</button>
     </span>`).join('')
       : `<span style="font-size:12px;color:var(--text3);">Hali teg yo'q</span>`;
     return `<div class="card">
@@ -2434,7 +2517,7 @@ async function deleteTag(id) {
 
 function renderStaff() {
   const el = document.getElementById('staff-list');
-  if (!staffList.length) { el.innerHTML = `<div class="empty"><div class="empty-icon">👤</div><h3>${t('no_data')}</h3></div>`; return; }
+  if (!staffList.length) { el.innerHTML = `<div class="empty"><div class="empty-icon">${ic('user')}</div><h3>${t('no_data')}</h3></div>`; return; }
   const canEdit = can('staff_manage');
   el.innerHTML = staffList.map(s => `<div class="card" style="display:flex;align-items:center;gap:12px;">
 <div class="avatar" style="width:40px;height:40px;font-size:14px;flex-shrink:0;">${esc(initialsOf(s.name))}</div>
@@ -2442,15 +2525,15 @@ function renderStaff() {
   <div style="font-weight:700;font-size:14px;">${esc(s.name)}</div>
   <div style="font-size:12px;color:var(--text2);">${esc(s.position || '')} ${s.branch_name ? '• ' + esc(s.branch_name) : ''}</div>
   <div style="font-size:11px;color:var(--text3);">Login: ${esc(s.login)}${s.user_id ? '' : ' • <span style="color:var(--red);">Auth\'ga ko\'chirilmagan</span>'}</div>
-  ${s.penalty_enabled ? `<span class="tag tag-red" style="display:inline-block;margin-top:4px;">💰 Jarima tizimida</span>` : ''}
-  ${s.frozen ? `<span class="tag tag-blue" style="display:inline-block;margin-top:4px;">🧊 Muzlatilgan</span>` : ''}
-  ${!s.frozen && penaltySettings ? `<div style="font-size:11px;color:var(--text3);margin-top:2px;">⏱ Kechikish: ${fmtLate(staffLateTotals[s.id] || 0)} / ${fmtLate((penaltySettings.freeze_limit_minutes || 0) * 60)}</div>` : ''}
+  ${s.penalty_enabled ? `<span class="tag tag-red" style="display:inline-block;margin-top:4px;">${ic('banknote')} Jarima tizimida</span>` : ''}
+  ${s.frozen ? `<span class="tag tag-blue" style="display:inline-block;margin-top:4px;">${ic('snowflake')} Muzlatilgan</span>` : ''}
+  ${!s.frozen && penaltySettings ? `<div style="font-size:11px;color:var(--text3);margin-top:2px;">${ic('timer')} Kechikish: ${fmtLate(staffLateTotals[s.id] || 0)} / ${fmtLate((penaltySettings.freeze_limit_minutes || 0) * 60)}</div>` : ''}
 </div>
 <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
-  ${s.frozen && can('staff_freeze') ? `<button class="btn btn-sm btn-primary" onclick="unfreezeStaff('${esc(s.id)}')" title="Muzlatishdan chiqarish">🔓</button>` : ''}
-  ${isSuper() ? `<button class="btn btn-sm ${s.penalty_enabled ? 'btn-primary' : 'btn-secondary'}" onclick="toggleStaffPenalty('${esc(s.id)}', ${!s.penalty_enabled})" title="${s.penalty_enabled ? 'Jarima tizimidan chiqarish' : 'Jarima tizimiga kiritish'}">💰</button>` : ''}
-  ${canEdit ? `<button class="btn btn-sm btn-secondary" onclick="editStaff('${esc(s.id)}')">✏️</button>
-  <button class="btn btn-sm btn-danger" onclick="deleteStaff('${esc(s.id)}')">🗑</button>` : ''}
+  ${s.frozen && can('staff_freeze') ? `<button class="btn btn-sm btn-primary" onclick="unfreezeStaff('${esc(s.id)}')" title="Muzlatishdan chiqarish">${ic('lock-open')}</button>` : ''}
+  ${isSuper() ? `<button class="btn btn-sm ${s.penalty_enabled ? 'btn-primary' : 'btn-secondary'}" onclick="toggleStaffPenalty('${esc(s.id)}', ${!s.penalty_enabled})" title="${s.penalty_enabled ? 'Jarima tizimidan chiqarish' : 'Jarima tizimiga kiritish'}">${ic('banknote')}</button>` : ''}
+  ${canEdit ? `<button class="btn btn-sm btn-secondary" onclick="editStaff('${esc(s.id)}')">${ic('pencil')}</button>
+  <button class="btn btn-sm btn-danger" onclick="deleteStaff('${esc(s.id)}')">${ic('trash')}</button>` : ''}
 </div>
 </div>`).join('');
 }
@@ -2471,8 +2554,8 @@ function renderFreeze() {
   <div style="font-size:12px;color:var(--text2);">Muzlatilgan: ${s.frozen_at ? fmtUzDateTime(s.frozen_at) : '—'}</div>
   <div style="font-size:11px;color:var(--text3);">Jami kechikish: ${fmtLate(s.frozen_late_seconds || 0)} (chegara ${fmtLate((s.frozen_limit_minutes || 0) * 60)})</div>
 </div>
-<button class="btn btn-sm btn-primary" onclick="unfreezeStaff('${esc(s.id)}')">🔓 Chiqarish</button>
-</div>`).join('') : `<div class="empty"><div class="empty-icon">✅</div><h3>Muzlatilgan xodim yo'q</h3></div>`;
+<button class="btn btn-sm btn-primary" onclick="unfreezeStaff('${esc(s.id)}')">${ic('lock-open')} Chiqarish</button>
+</div>`).join('') : `<div class="empty"><div class="empty-icon">${ic('check-circle')}</div><h3>Muzlatilgan xodim yo'q</h3></div>`;
 }
 
 async function saveFreezeLimit() {
@@ -2561,7 +2644,7 @@ function addShiftRow(start = '', end = '', days = []) {
   <input type="time" value="${esc(start)}" class="sh-start" style="flex:1;padding:9px;border-radius:10px;border:none;background:var(--inset-bg);color:var(--text);box-shadow:var(--shadow-in);font-family:Manrope,sans-serif;">
   <span style="color:var(--text2);">—</span>
   <input type="time" value="${esc(end)}" class="sh-end" style="flex:1;padding:9px;border-radius:10px;border:none;background:var(--inset-bg);color:var(--text);box-shadow:var(--shadow-in);font-family:Manrope,sans-serif;">
-  <button class="btn btn-sm btn-danger btn-icon" onclick="this.closest('.shift-card').remove()">✕</button>
+  <button class="btn btn-sm btn-danger btn-icon" onclick="this.closest('.shift-card').remove()">${ic('x')}</button>
 </div>
 <div style="display:flex;gap:5px;flex-wrap:wrap;" class="sh-days">${dayBtns}</div>`;
   c.appendChild(div);
@@ -2617,15 +2700,15 @@ async function deleteStaff(id) {
 // ============================================================
 function renderBranches() {
   const el = document.getElementById('branches-list');
-  if (!branches.length) { el.innerHTML = `<div class="empty"><div class="empty-icon">🏢</div><h3>${t('no_data')}</h3></div>`; return; }
+  if (!branches.length) { el.innerHTML = `<div class="empty"><div class="empty-icon">${ic('building')}</div><h3>${t('no_data')}</h3></div>`; return; }
   el.innerHTML = branches.map(b => `<div class="card" style="display:flex;align-items:center;gap:12px;">
-<div style="width:36px;height:36px;border-radius:10px;background:rgba(124,155,255,0.15);display:flex;align-items:center;justify-content:center;font-size:18px;">🏢</div>
+<div style="width:36px;height:36px;border-radius:10px;background:rgba(124,155,255,0.15);display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--accent);">${ic('building')}</div>
 <div style="flex:1;">
   <div style="font-weight:700;font-size:14px;">${esc(b.name)}</div>
   <div style="font-size:12px;color:var(--text2);">${esc(b.address || '')}</div>
-  <div style="font-size:11px;margin-top:2px;color:${(b.lat != null && b.lng != null) ? 'var(--accent)' : 'var(--red)'};">${(b.lat != null && b.lng != null) ? `📍 GPS o'rnatilgan • ${esc(b.radius || 100)}m` : '⚠ GPS belgilanmagan'}</div>
+  <div style="font-size:11px;margin-top:2px;color:${(b.lat != null && b.lng != null) ? 'var(--accent)' : 'var(--red)'};">${(b.lat != null && b.lng != null) ? `${ic('map-pin')} GPS o'rnatilgan • ${esc(b.radius || 100)}m` : ic('alert-triangle') + ' GPS belgilanmagan'}</div>
 </div>
-<button class="btn btn-sm btn-danger" onclick="deleteBranch('${esc(b.id)}')">🗑</button>
+<button class="btn btn-sm btn-danger" onclick="deleteBranch('${esc(b.id)}')">${ic('trash')}</button>
 </div>`).join('');
 }
 
@@ -2683,7 +2766,7 @@ async function deleteBranch(id) {
 function renderAdmins() {
   if (!isSuper()) return;
   const el = document.getElementById('admins-list');
-  if (!admins.length) { el.innerHTML = `<div class="empty"><div class="empty-icon">👤</div><h3>${t('no_data')}</h3></div>`; return; }
+  if (!admins.length) { el.innerHTML = `<div class="empty"><div class="empty-icon">${ic('user')}</div><h3>${t('no_data')}</h3></div>`; return; }
   el.innerHTML = admins.map(a => {
     const granted = a.is_super ? PERMISSION_KEYS.length : PERMISSION_KEYS.filter(k => (a.permissions || {})[k] === true).length;
     return `<div class="card" style="display:flex;align-items:center;gap:12px;">
@@ -2694,8 +2777,8 @@ function renderAdmins() {
   <div style="font-size:11px;color:var(--text3);">Ruxsatlar: ${a.is_super ? 'barchasi' : `${granted} / ${PERMISSION_KEYS.length}`}</div>
 </div>
 ${a.is_super ? '' : `<div style="display:flex;gap:6px;">
-  <button class="btn btn-sm btn-secondary btn-icon" onclick="openEditAdmin('${esc(a.id)}')" title="Ruxsatlarni tahrirlash">✏️</button>
-  <button class="btn btn-sm btn-danger btn-icon" onclick="deleteAdmin('${esc(a.id)}')">🗑</button>
+  <button class="btn btn-sm btn-secondary btn-icon" onclick="openEditAdmin('${esc(a.id)}')" title="Ruxsatlarni tahrirlash">${ic('pencil')}</button>
+  <button class="btn btn-sm btn-danger btn-icon" onclick="deleteAdmin('${esc(a.id)}')">${ic('trash')}</button>
 </div>`}
 </div>`;
   }).join('');
@@ -2706,7 +2789,7 @@ let editingAdminId = null;
 // Ruxsatlar ro'yxati (guruhlar bo'yicha checkbox'lar) — bir nechtasini tanlash mumkin
 function buildPermChecks(selected) {
   document.getElementById('perm-checks').innerHTML = PERMISSIONS.map(g => `<div>
-  <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;">${esc(g.group)}</div>
+  <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;display:flex;align-items:center;gap:6px;">${ic(g.icon)} ${esc(g.group)}</div>
   ${g.items.map(([key, label]) => `<label style="display:flex;align-items:center;gap:8px;font-size:14px;margin-bottom:6px;">
     <input type="checkbox" data-perm="${esc(key)}"${selected[key] === true ? ' checked' : ''}> ${esc(label)}</label>`).join('')}
 </div>`).join('');
@@ -2902,7 +2985,7 @@ function initInstallPrompt() {
     deferredInstall = null;
     const btn = document.getElementById('install-banner');
     if (btn) btn.style.display = 'none';
-    showToast('Ilova o\'rnatildi ✓', 2000, 'ok');
+    showToast('Ilova o\'rnatildi', 2000, 'ok');
   });
   // iOS Safari beforeinstallprompt'ni qo'llab-quvvatlamaydi — qo'lda ko'rsatma
   const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
@@ -2938,7 +3021,7 @@ async function updateApp(btn) {
     const m = (await res.text()).match(/const APP_VERSION = '([^']+)'/);
     const latest = m ? m[1] : null;
     if (latest && latest === APP_VERSION) {
-      showToast(`Siz eng so'nggi versiyadasiz (${APP_VERSION}) ✓`, 2500, 'ok');
+      showToast(`Siz eng so'nggi versiyadasiz (${APP_VERSION})`, 2500, 'ok');
       restore();
       return;
     }

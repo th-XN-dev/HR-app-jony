@@ -1432,3 +1432,29 @@ DESKTOP / TABLET RESPONSIVE
      opacity: 1;
    }
  }
+
+/* ============================================================
+   IKONKALAR (SVG, matn rangini oladi)
+   ============================================================ */
+.ic {
+  width: 1.1em;
+  height: 1.1em;
+  flex-shrink: 0;
+  vertical-align: -0.18em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.ic-xl { width: 44px; height: 44px; stroke-width: 1.6; }
+.empty-icon .ic { width: 40px; height: 40px; stroke-width: 1.6; color: var(--text3); }
+#toast { display: flex; align-items: center; gap: 8px; }
+#toast .ic { width: 18px; height: 18px; }
+.tag .ic { width: 1em; height: 1em; margin-right: 2px; }
+.dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; vertical-align: 1px; margin-right: 4px; }
+.dot-green { background: var(--green); }
+.dot-gray { background: var(--text3); }
+.ic-line { display: flex; align-items: flex-start; gap: 8px; }
+.ic-line .ic { margin-top: 0.2em; color: var(--text3); }
+.tag:has(.ic) { white-space: nowrap; }

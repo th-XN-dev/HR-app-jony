@@ -151,6 +151,11 @@ alter table attendance add column if not exists manual_comment text;
 alter table attendance add column if not exists manual_by text;
 alter table attendance add column if not exists permit_until text;
 alter table attendance add column if not exists permit_comment text;
+-- O'chirilgan davomat: yozuv bazada qoladi (tarix), lekin ro'yxat, hisobot va hisob-kitoblarda ko'rinmaydi
+alter table attendance add column if not exists deleted boolean not null default false;
+alter table attendance add column if not exists deleted_at timestamptz;
+alter table attendance add column if not exists deleted_by text;
+alter table attendance add column if not exists delete_reason text;
 
 -- Kechikishga ruxsat: xodimning ma'lum kundagi ish boshlanishi belgilangan vaqtgacha suriladi
 create table if not exists attendance_permits (
@@ -244,7 +249,7 @@ language sql immutable as $$
     'attendance', 'attendance_edit', 'reports',
     'tasks_view', 'tasks_manage',
     'staff_view', 'staff_manage', 'branches',
-    'penalty_settings', 'staff_freeze', 'penalty_cancel', 'attendance_permit'
+    'penalty_settings', 'staff_freeze', 'penalty_cancel', 'attendance_permit', 'attendance_delete'
   ]
 $$;
 
@@ -525,7 +530,7 @@ begin
   select freeze_limit_minutes into v_limit from penalty_settings where id = 1;
   select coalesce(sum(late_seconds), 0) into v_total
     from attendance
-   where staff_id = s.id and type = 'checkin' and time >= s.late_counter_from;
+   where staff_id = s.id and type = 'checkin' and not deleted and time >= s.late_counter_from;
   if v_limit is null or v_total < v_limit::bigint * 60 then return null; end if;
   update staff
      set frozen = true, frozen_at = now(), frozen_late_seconds = least(v_total, 2147483647)::int, frozen_limit_minutes = v_limit
@@ -560,7 +565,7 @@ create or replace function public.staff_late_totals() returns table (staff_id uu
 language sql stable security definer set search_path = public as $$
   select s.id, coalesce(sum(a.late_seconds), 0)::bigint
     from staff s
-    left join attendance a on a.staff_id = s.id and a.type = 'checkin' and a.time >= s.late_counter_from
+    left join attendance a on a.staff_id = s.id and a.type = 'checkin' and not a.deleted and a.time >= s.late_counter_from
    where public.is_admin()
    group by s.id
 $$;
@@ -638,26 +643,25 @@ begin
    where staff_id = p_staff.id and not cancelled and late_at >= v_month_from and late_at < v_month_from + interval '1 month';
 
   if v_kind = 'fine' then
-    v_title := '💰 Jarima: ' || fmt_money(v_amount) || ' ' || cfg.currency || ' — ' || fmt_late(p_att.late_seconds) || ' kechikish'
+    v_title := 'Jarima: ' || fmt_money(v_amount) || ' ' || cfg.currency || ' — ' || fmt_late(p_att.late_seconds) || ' kechikish'
                || coalesce(' · ' || discipline_label(v_level), '');
   else
-    v_title := case v_level when 'notice' then '🔔 ' when 'warning' then '⚠️ ' when 'reprimand' then '❗ ' else '⛔ ' end
-               || discipline_label(v_level) || ' — ' || fmt_late(p_att.late_seconds) || ' kechikish';
+    v_title := discipline_label(v_level) || ' — ' || fmt_late(p_att.late_seconds) || ' kechikish';
   end if;
 
   v_body := concat_ws(E'\n',
-    '📅 Kun: ' || to_char(v_local, 'DD.MM.YYYY') || ', ' || v_dows[extract(dow from v_local)::int + 1],
-    case when v_shift is not null then '🕘 Ish boshlanishi: ' || v_shift
+    'Kun: ' || to_char(v_local, 'DD.MM.YYYY') || ', ' || v_dows[extract(dow from v_local)::int + 1],
+    case when v_shift is not null then 'Ish boshlanishi: ' || v_shift
       || case when p_att.permit_until is not null then ' (ruxsat bilan surilgan)' else '' end end,
-    case when p_att.permit_until is not null then '📝 Ruxsat izohi: ' || p_att.permit_comment end,
-    case when p_att.manual then '✍️ Qo''lda belgilandi (' || coalesce(p_att.manual_by, 'admin') || '): ' || coalesce(p_att.manual_comment, '') end,
-    '🚪 Kelgan vaqt: ' || to_char(v_local, 'HH24:MI:SS'),
-    '⏱ Kechikish: ' || fmt_late(p_att.late_seconds) || ' (' || p_att.late_minutes || ' daqiqa)',
+    case when p_att.permit_until is not null then 'Ruxsat izohi: ' || p_att.permit_comment end,
+    case when p_att.manual then 'Qo''lda belgilandi (' || coalesce(p_att.manual_by, 'admin') || '): ' || coalesce(p_att.manual_comment, '') end,
+    'Kelgan vaqt: ' || to_char(v_local, 'HH24:MI:SS'),
+    'Kechikish: ' || fmt_late(p_att.late_seconds) || ' (' || p_att.late_minutes || ' daqiqa)',
     case when v_kind = 'fine' then
-      '💰 Hisob: ' || v_units || ' ' || v_unit_lbl || ' × ' || fmt_money(cfg.amount) || ' ' || cfg.currency
+      'Hisob: ' || v_units || ' ' || v_unit_lbl || ' × ' || fmt_money(cfg.amount) || ' ' || cfg.currency
       || ' = ' || fmt_money(v_amount) || ' ' || cfg.currency end,
-    case when v_level is not null then '⚖️ Intizomiy chora: ' || discipline_label(v_level) end,
-    '📊 ' || v_mons[extract(month from v_local)::int] || ' ' || extract(year from v_local)::int || ' bo''yicha: '
+    case when v_level is not null then 'Intizomiy chora: ' || discipline_label(v_level) end,
+    v_mons[extract(month from v_local)::int] || ' ' || extract(year from v_local)::int || ' bo''yicha: '
       || m_days || ' kun kechikkan, jami ' || fmt_late(m_sec::int)
       || case when v_kind = 'fine' then ', jami jarima ' || fmt_money(m_amount) || ' ' || cfg.currency else '' end);
 
@@ -676,11 +680,18 @@ end $$;
 -- Asl bildirishnoma "Bekor qilingan" deb belgilanadi va xodimga yangi bildirishnoma yuboriladi.
 create or replace function public.cancel_penalty(p_id uuid, p_reason text) returns jsonb
 language plpgsql security definer set search_path = public as $$
-declare pen penalties; v_by text; v_what text; v_now text;
 begin
   if not public.admin_can('penalty_cancel') then raise exception 'FORBIDDEN' using errcode = '42501'; end if;
   p_reason := btrim(coalesce(p_reason, ''));
   if p_reason = '' then raise exception 'NEED_REASON'; end if;
+  return public.do_cancel_penalty(p_id, p_reason);
+end $$;
+
+-- Ichki: jarimani bekor qilish (ruxsat tekshiruvi chaqiruvchida)
+create or replace function public.do_cancel_penalty(p_id uuid, p_reason text) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare pen penalties; v_by text; v_what text; v_now text;
+begin
   select * into pen from penalties where id = p_id for update;
   if not found then raise exception 'NOT_FOUND'; end if;
   if pen.cancelled then raise exception 'ALREADY_CANCELLED'; end if;
@@ -698,23 +709,63 @@ begin
 
   if pen.task_id is not null then
     update tasks
-       set title = '❌ Bekor qilingan · ' || title,
-           body  = coalesce(body, '') || E'\n\n❌ Bekor qilindi: ' || v_now || ' (' || v_by || ')' || E'\nSabab: ' || left(p_reason, 500)
-     where id = pen.task_id and title not like '❌ Bekor qilingan%';
+       set title = 'Bekor qilingan · ' || title,
+           body  = coalesce(body, '') || E'\n\nBekor qilindi: ' || v_now || ' (' || v_by || ')' || E'\nSabab: ' || left(p_reason, 500)
+     where id = pen.task_id and title not like 'Bekor qilingan%';
   end if;
 
   if pen.staff_id is not null then
     insert into tasks (title, body, type, assigned_to, assigned_name, created_by, replies, done)
-    values ('✅ ' || v_what || ' bekor qilindi',
+    values (v_what || ' bekor qilindi',
             concat_ws(E'\n',
-              '📅 Kechikish kuni: ' || to_char(pen.late_at at time zone 'Asia/Tashkent', 'DD.MM.YYYY HH24:MI'),
-              '⏱ Kechikish: ' || fmt_late(pen.late_seconds),
-              '✅ Bekor qilindi: ' || v_now || ' (' || v_by || ')',
-              '💬 Sabab: ' || left(p_reason, 500)),
+              'Kechikish kuni: ' || to_char(pen.late_at at time zone 'Asia/Tashkent', 'DD.MM.YYYY HH24:MI'),
+              'Kechikish: ' || fmt_late(pen.late_seconds),
+              'Bekor qilindi: ' || v_now || ' (' || v_by || ')',
+              'Sabab: ' || left(p_reason, 500)),
             pen.kind, pen.staff_id, pen.staff_name, 'system', '[]'::jsonb, false);
   end if;
 
   return jsonb_build_object('id', pen.id, 'cancelled', true, 'cancelled_by', v_by);
+end $$;
+
+-- Ruxsati bor admin: davomat yozuvini o'chirish (izoh majburiy).
+-- Yozuv bazada "o'chirilgan" deb qoladi; unga bog'langan jarima avtomatik bekor qilinadi; xodimga xabar boradi.
+create or replace function public.delete_attendance(p_id uuid, p_reason text) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare a attendance; v_by text; v_pen uuid; v_pen_cancelled boolean := false;
+begin
+  if not public.admin_can('attendance_delete') then raise exception 'FORBIDDEN' using errcode = '42501'; end if;
+  p_reason := btrim(coalesce(p_reason, ''));
+  if p_reason = '' then raise exception 'NEED_COMMENT'; end if;
+  select * into a from attendance where id = p_id for update;
+  if not found or a.deleted then raise exception 'NOT_FOUND'; end if;
+
+  v_by := coalesce((select name from admins where user_id = auth.uid()),
+                   (select name from staff where user_id = auth.uid()), 'Admin');
+  update attendance
+     set deleted = true, deleted_at = now(), deleted_by = v_by, delete_reason = left(p_reason, 500)
+   where id = a.id;
+
+  select id into v_pen from penalties where attendance_id = a.id and not cancelled;
+  if v_pen is not null then
+    perform public.do_cancel_penalty(v_pen, 'Davomat yozuvi o''chirildi: ' || p_reason);
+    v_pen_cancelled := true;
+  end if;
+
+  if a.staff_id is not null then
+    insert into tasks (title, body, type, assigned_to, assigned_name, created_by, replies, done)
+    values ('Davomat yozuvi o''chirildi: ' || to_char(a.time at time zone 'Asia/Tashkent', 'DD.MM.YYYY HH24:MI'),
+            concat_ws(E'\n',
+              to_char(a.time at time zone 'Asia/Tashkent', 'DD.MM.YYYY HH24:MI')
+                || ' — ' || case when a.type = 'checkin' then 'Keldim' else 'Ketdim' end
+                || coalesce(' (' || a.branch_name || ')', ''),
+              'O''chirdi: ' || v_by,
+              'Sabab: ' || left(p_reason, 500),
+              case when v_pen_cancelled then 'Shu yozuvga bog''liq jarima / chora bekor qilindi.' end),
+            'note', a.staff_id, a.staff_name, 'system', '[]'::jsonb, false);
+  end if;
+
+  return jsonb_build_object('id', a.id, 'deleted', true, 'penalty_cancelled', v_pen_cancelled);
 end $$;
 
 -- Unutilgan Ketdim'ni avtomatik yopish (smena tugashi + 60 daqiqadan keyin)
@@ -725,7 +776,7 @@ begin
   select * into s from staff where user_id = auth.uid();
   if not found then return false; end if;
   perform pg_advisory_xact_lock(hashtext('att:' || s.id::text));
-  select * into v_last from attendance where staff_id = s.id order by time desc limit 1;
+  select * into v_last from attendance where staff_id = s.id and not deleted order by time desc limit 1;
   if v_last.id is null or v_last.type <> 'checkin' then return false; end if;
   select * into sh from public.pick_shift(s.shifts, v_last.time at time zone 'Asia/Tashkent');
   if not found or sh.dur_min is null then return false; end if;
@@ -756,7 +807,7 @@ begin
   perform public.close_my_stale_session();
   perform pg_advisory_xact_lock(hashtext('att:' || s.id::text));
 
-  select * into v_last from attendance where staff_id = s.id order by time desc limit 1;
+  select * into v_last from attendance where staff_id = s.id and not deleted order by time desc limit 1;
   v_open := v_last.id is not null and v_last.type = 'checkin'
             and (v_last.time at time zone 'Asia/Tashkent')::date = v_today;
 
@@ -845,7 +896,7 @@ begin
     raise exception 'TIME_OUT_OF_SHIFT';
   end if;
 
-  if exists (select 1 from attendance where staff_id = s.id and type = 'checkin'
+  if exists (select 1 from attendance where staff_id = s.id and type = 'checkin' and not deleted
              and (time at time zone 'Asia/Tashkent')::date = p_date) then
     raise exception 'ALREADY_CHECKED_IN';
   end if;
@@ -863,14 +914,14 @@ begin
 
   v_shift := lpad((sh.start_min / 60)::text, 2, '0') || ':' || lpad((sh.start_min % 60)::text, 2, '0');
   insert into tasks (title, body, type, assigned_to, assigned_name, created_by, replies, done)
-  values ('🕘 Kechikishga ruxsat: ' || to_char(p_date, 'DD.MM.YYYY') || ', ' || to_char(v_until, 'HH24:MI') || ' gacha',
+  values ('Kechikishga ruxsat: ' || to_char(p_date, 'DD.MM.YYYY') || ', ' || to_char(v_until, 'HH24:MI') || ' gacha',
           concat_ws(E'\n',
-            '📅 Kun: ' || to_char(p_date, 'DD.MM.YYYY'),
-            '🕘 Ish boshlanishi ' || v_shift || ' → ' || to_char(v_until, 'HH24:MI') || ' ga surildi',
+            'Kun: ' || to_char(p_date, 'DD.MM.YYYY'),
+            'Ish boshlanishi ' || v_shift || ' → ' || to_char(v_until, 'HH24:MI') || ' ga surildi',
             'Shu vaqtgacha kelsangiz, kechikish va jarima hisoblanmaydi.',
-            '📝 Izoh: ' || left(p_comment, 500),
-            '👤 Ruxsat berdi: ' || v_by,
-            case when v_old > 0 then '♻️ Shu kunga avvalgi ruxsat almashtirildi.' end),
+            'Izoh: ' || left(p_comment, 500),
+            'Ruxsat berdi: ' || v_by,
+            case when v_old > 0 then 'Shu kunga avvalgi ruxsat almashtirildi.' end),
           'note', s.id, s.name, 'system', '[]'::jsonb, false);
 
   return jsonb_build_object('id', v_id, 'staff_name', s.name, 'date', p_date, 'until', to_char(v_until, 'HH24:MI'),
@@ -884,7 +935,7 @@ begin
   if not public.admin_can('attendance_permit') then raise exception 'FORBIDDEN' using errcode = '42501'; end if;
   select * into pm from attendance_permits where id = p_id for update;
   if not found or pm.cancelled then raise exception 'NOT_FOUND'; end if;
-  if exists (select 1 from attendance where staff_id = pm.staff_id and type = 'checkin'
+  if exists (select 1 from attendance where staff_id = pm.staff_id and type = 'checkin' and not deleted
              and (time at time zone 'Asia/Tashkent')::date = pm.permit_date) then
     raise exception 'PERMIT_USED';
   end if;
@@ -893,8 +944,8 @@ begin
   update attendance_permits set cancelled = true, cancelled_by = v_by, cancelled_at = now() where id = pm.id;
   if pm.staff_id is not null then
     insert into tasks (title, body, type, assigned_to, assigned_name, created_by, replies, done)
-    values ('❌ Kechikishga ruxsat bekor qilindi: ' || to_char(pm.permit_date, 'DD.MM.YYYY'),
-            '📅 Kun: ' || to_char(pm.permit_date, 'DD.MM.YYYY') || E'\nIsh vaqtingiz odatdagidek.' || E'\n👤 Bekor qildi: ' || v_by,
+    values ('Kechikishga ruxsat bekor qilindi: ' || to_char(pm.permit_date, 'DD.MM.YYYY'),
+            'Kun: ' || to_char(pm.permit_date, 'DD.MM.YYYY') || E'\nIsh vaqtingiz odatdagidek.' || E'\nBekor qildi: ' || v_by,
             'note', pm.staff_id, pm.staff_name, 'system', '[]'::jsonb, false);
   end if;
 end $$;
@@ -943,7 +994,7 @@ begin
     'update_my_name(text)', 'set_admin_permissions(uuid,jsonb)', 'set_staff_penalty(uuid,boolean)',
     'close_my_stale_session()', 'staff_check(text,float8,float8,uuid)',
     'admin_add_attendance(uuid,uuid,text,timestamptz,text)', 'can_see_task(uuid)',
-    'grant_permit(uuid,date,text,text)', 'cancel_permit(uuid)',
+    'grant_permit(uuid,date,text,text)', 'cancel_permit(uuid)', 'delete_attendance(uuid,text)',
     'task_set_done(uuid,boolean)', 'task_add_reply(uuid,text)',
     'unfreeze_staff(uuid)', 'set_freeze_limit(int)', 'staff_late_totals()', 'cancel_penalty(uuid,text)'
   ] loop
@@ -953,6 +1004,7 @@ begin
   -- Ichki funksiya: faqat boshqa server funksiyalari chaqiradi
   revoke all on function public.apply_lateness(attendance, staff, int) from public, anon, authenticated;
   revoke all on function public.lateness_with_permit(uuid, jsonb, timestamptz) from public, anon, authenticated;
+  revoke all on function public.do_cancel_penalty(uuid, text) from public, anon, authenticated;
   revoke all on function public.check_freeze(uuid) from public, anon, authenticated;
 end $$;
 
@@ -992,9 +1044,11 @@ create policy staff_read  on staff  for select to authenticated using (public.is
 create policy admins_read on admins for select to authenticated using (public.app_role() = 'superadmin' or user_id = auth.uid());
 
 -- Davomat: ruxsati bor admin yoki xodimning o'zi. Yozish — faqat RPC
+-- O'chirilgan yozuvlar hech kimga ko'rinmaydi (bazada tarix sifatida qoladi)
 create policy attendance_read on attendance for select to authenticated
-  using (public.admin_can_any(array['attendance', 'attendance_edit', 'reports', 'dashboard', 'dashboard_late', 'dashboard_absent'])
-         or staff_id = public.my_staff_id());
+  using (not deleted
+         and (public.admin_can_any(array['attendance', 'attendance_edit', 'attendance_delete', 'reports', 'dashboard', 'dashboard_late', 'dashboard_absent'])
+              or staff_id = public.my_staff_id()));
 
 -- Vazifalar: xodim o'ziga va "barcha xodimlar"ga berilganini; admin "tasks_view"/"tasks_manage" bilan
 create policy tasks_read  on tasks for select to authenticated
@@ -1053,3 +1107,9 @@ select * from (values
   ('late','Salomatlik',4), ('late','Boshqa',9)
 ) as v(kind, label, sort)
 where not exists (select 1 from app_tags);
+
+-- =============================================
+-- API keshini yangilash: yangi/o'zgargan funksiyalar darhol ko'rinsin
+-- ("Could not find the function ... in the schema cache" xatosining oldini oladi)
+-- =============================================
+notify pgrst, 'reload schema';
