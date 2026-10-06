@@ -44,7 +44,7 @@ SQL Editor'da `supabase_finalize.sql` ni ishga tushiring. Agar Auth'ga bog'lanma
 
 ## 5. Saytni yangilash
 Quyidagi fayllarni hostingga joylang: `index.html`, `app.js`, `styles.css`, `sw.js`, `manifest.json`, ikonkalar.
-Service worker keshi (`jony-kids-v13`) yangilangani uchun telefonlar yangi versiyani o'zi yuklab oladi. Hamma bir marta qayta login qiladi.
+Service worker keshi (`jony-kids-v14`) yangilangani uchun telefonlar yangi versiyani o'zi yuklab oladi. Hamma bir marta qayta login qiladi.
 
 ## 6. Jarima tizimini sozlash (Super Admin)
 1. **Boshqaruv → Jarima:** hisoblash birligini (soniya / daqiqa / soat), summani, valyutani va intizom chegaralarini kiriting.

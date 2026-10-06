@@ -1,5 +1,5 @@
 // JONY KIDS Service Worker — network-first (yangilanish darhol ko'rinadi)
-const CACHE = 'jony-kids-v13';
+const CACHE = 'jony-kids-v14';
 const ASSETS = ['./', './index.html', './app.js', './styles.css', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {

@@ -1458,3 +1458,48 @@ DESKTOP / TABLET RESPONSIVE
 .ic-line { display: flex; align-items: flex-start; gap: 8px; }
 .ic-line .ic { margin-top: 0.2em; color: var(--text3); }
 .tag:has(.ic) { white-space: nowrap; }
+
+/* ============================================================
+   HISOBOT JADVALI
+   ============================================================ */
+.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.report-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.report-table th {
+  text-align: left; padding: 10px 8px; color: var(--text2); font-size: 12px; font-weight: 700;
+  border-bottom: 1px solid var(--card-border); white-space: nowrap;
+}
+.report-table td { padding: 10px 8px; border-bottom: 1px solid var(--card-border); vertical-align: middle; }
+.report-table tbody tr:hover td { background: rgba(108, 124, 224, 0.05); }
+.report-table .name { font-weight: 600; min-width: 140px; }
+.report-table .nowrap { white-space: nowrap; }
+.report-table .muted { color: var(--text2); }
+.report-table .strong { font-weight: 700; }
+.report-table .num { text-align: right; white-space: nowrap; }
+.report-table .reason { min-width: 180px; }
+.report-table .act { width: 1%; text-align: right; white-space: nowrap; }
+.report-table .note { font-size: 11px; color: var(--text2); margin-top: 2px; }
+.report-table .note-accent { color: var(--accent); }
+.act-in { color: var(--green); display: inline-flex; align-items: center; gap: 4px; }
+.act-out { color: var(--text2); display: inline-flex; align-items: center; gap: 4px; }
+.muted-warn { font-size: 11px; color: var(--yellow); white-space: nowrap; }
+
+/* Badge'lar bir qatorda qolsin ("12 daqiqa" ikkiga bo'linmasin) */
+.late-badge, .on-time-badge, .time-badge { white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; }
+
+/* Kichik ikonka-tugma (jadval va ro'yxatlarda) */
+.icon-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; padding: 0; border: none; border-radius: 10px; cursor: pointer;
+  background: var(--card); color: var(--text2); box-shadow: var(--shadow-out-sm);
+  transition: background 0.15s, transform 0.12s;
+}
+.icon-btn:active { transform: scale(0.94); }
+.icon-btn .ic { width: 16px; height: 16px; }
+.icon-btn-danger { color: var(--red); }
+.icon-btn-danger:hover { background: rgba(224, 107, 124, 0.12); }
+
+/* Tablar ko'p bo'lsa (Davomat: 5, Boshqaruv: 6) — sahifani kengaytirmasdan gorizontal suriladi */
+.tabs { overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; max-width: 100%; }
+.tabs::-webkit-scrollbar { display: none; }
+.tab { flex: 1 0 auto; white-space: nowrap; padding-left: 14px; padding-right: 14px; }
+.page-content { min-width: 0; }

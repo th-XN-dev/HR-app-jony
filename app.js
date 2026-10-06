@@ -155,7 +155,7 @@ function initialsOf(name) { return String(name || '?').split(' ').filter(Boolean
 // ============================================================
 // STATE
 // ============================================================
-const APP_VERSION = 'upg 23';
+const APP_VERSION = 'upg 24';
 let currentUser = null;
 let staffList = [], branches = [], tasks = [], attendances = [], admins = [];
 let penaltySettings = null;
@@ -1343,11 +1343,21 @@ async function myCheck(type) {
 // ============================================================
 // ATTENDANCE (Admin)
 // ============================================================
+// Tanlangan tab gorizontal ro'yxatda ko'rinib tursin
+function scrollTabIntoView(id) {
+  const el = document.getElementById(id);
+  if (el && el.parentElement) {
+    const box = el.parentElement;
+    box.scrollTo({ left: el.offsetLeft - (box.clientWidth - el.offsetWidth) / 2, behavior: 'smooth' });
+  }
+}
+
 function switchAttTab(tab) {
   ['checkin', 'report', 'late', 'issues', 'permits'].forEach(t => {
     document.getElementById('att-' + t).classList.toggle('hidden', t !== tab);
     document.getElementById('att-tab-' + t).classList.toggle('active', t === tab);
   });
+  scrollTabIntoView('att-tab-' + tab);
   if (tab === 'checkin') loadAttendance().catch(e => showToast(errMsg(e), 4000));
   if (tab === 'report') { populateReportBranch(); loadReport(); }
   if (tab === 'late') loadLate().catch(e => showToast(errMsg(e), 4000));
@@ -1625,7 +1635,7 @@ let _deleteAtt = null;
 
 function deleteAttButton(a) {
   if (!can('attendance_delete')) return '';
-  return `<button class="btn btn-sm btn-danger btn-icon" style="padding:2px 8px;min-height:0;font-size:12px;" title="Yozuvni o'chirish" onclick="openDeleteAttendance('${esc(a.id)}')">${ic('trash')}</button>`;
+  return `<button class="icon-btn icon-btn-danger" title="Yozuvni o'chirish" aria-label="Yozuvni o'chirish" onclick="openDeleteAttendance('${esc(a.id)}')">${ic('trash')}</button>`;
 }
 
 function openDeleteAttendance(id) {
@@ -2055,31 +2065,34 @@ ${segs}
 function renderReportTable(data) {
   const el = document.getElementById('report-table');
   if (!data.length) { el.innerHTML = `<div class="empty"><h3>${t('no_data')}</h3></div>`; _lastReportData = []; return; }
-  el.innerHTML = `<div style="overflow-x:auto;">
-<table style="width:100%;border-collapse:collapse;font-size:13px;">
-  <thead><tr style="color:var(--text2);">
-    <th style="text-align:left;padding:8px 4px;border-bottom:1px solid var(--card-border);">Xodim</th>
-    <th style="text-align:left;padding:8px 4px;border-bottom:1px solid var(--card-border);">Sana</th>
-    <th style="text-align:left;padding:8px 4px;border-bottom:1px solid var(--card-border);">Vaqt</th>
-    <th style="text-align:left;padding:8px 4px;border-bottom:1px solid var(--card-border);">Amal</th>
-    <th style="text-align:right;padding:8px 4px;border-bottom:1px solid var(--card-border);">Kechikish</th>
-    <th style="text-align:left;padding:8px 4px;border-bottom:1px solid var(--card-border);">Sabab</th>
+  const canDel = can('attendance_delete');
+  el.innerHTML = `<div class="table-wrap">
+<table class="report-table">
+  <thead><tr>
+    <th>Xodim</th><th>Sana</th><th>Vaqt</th><th>Amal</th><th class="num">Kechikish</th><th>Sabab / izoh</th>${canDel ? '<th class="act"></th>' : ''}
   </tr></thead>
   <tbody>${data.map(r => {
     const lp = uzParts(new Date(r.time));
-    const dateStr = `${String(lp.day).padStart(2, '0')}.${String(lp.month).padStart(2, '0')}.${lp.year}`;
-    const timeStr = `${String(lp.hour).padStart(2, '0')}:${String(lp.minute).padStart(2, '0')}`;
+    const dateStr = `${pad2(lp.day)}.${pad2(lp.month)}.${lp.year}`;
+    const timeStr = `${pad2(lp.hour)}:${pad2(lp.minute)}`;
     const reasonCell = (r.late_reason ? `<span class="tag tag-yellow">${esc(r.late_reason)}</span>` : '')
-      + (r.late_comment ? `<div style="font-size:11px;color:var(--text2);margin-top:2px;">${esc(r.late_comment)}</div>` : '')
-      + (r.permit_until ? `<div style="font-size:11px;color:var(--accent);margin-top:2px;">${ic('clock')} Ruxsat ${esc(r.permit_until)} gacha: ${esc(r.permit_comment || '')}</div>` : '')
-      + (r.manual ? `<div style="font-size:11px;color:var(--text2);margin-top:2px;">${ic('pen-line')} Qo'lda (${esc(r.manual_by || '')}): ${esc(r.manual_comment || '')}</div>` : '');
+      + (r.late_comment ? `<div class="note">${esc(r.late_comment)}</div>` : '')
+      + (r.permit_until ? `<div class="note note-accent">${ic('clock')} Ruxsat ${esc(r.permit_until)} gacha: ${esc(r.permit_comment || '')}</div>` : '')
+      + (r.manual ? `<div class="note">${ic('pen-line')} Qo'lda (${esc(r.manual_by || '')}): ${esc(r.manual_comment || '')}</div>` : '');
+    const action = r.type === 'checkin'
+      ? `<span class="act-in">${ic('log-in')} Keldi</span>`
+      : `<span class="act-out">${ic('log-out')} Ketdi</span>`;
+    const late = r.late_minutes > 0
+      ? `<span class="late-badge">${fmtDuration(r.late_minutes)}</span>`
+      : (r.type === 'checkin' && r.no_shift ? `<span class="muted-warn">Smena yo'q</span>` : '');
     return `<tr>
-      <td style="padding:8px 4px;border-bottom:1px solid var(--card-border);font-weight:600;">${esc(r.staff_name || '-')}</td>
-      <td style="padding:8px 4px;border-bottom:1px solid var(--card-border);color:var(--text2);">${dateStr}</td>
-      <td style="padding:8px 4px;border-bottom:1px solid var(--card-border);font-weight:700;">${timeStr}</td>
-      <td style="padding:8px 4px;border-bottom:1px solid var(--card-border);">${r.type === 'checkin' ? '<span style="color:var(--green);">' + ic('log-in') + ' Keldi</span>' : '<span style="color:var(--text2);">' + ic('log-out') + ' Ketdi</span>'}${r.auto_closed ? ' <span style="color:var(--yellow);font-size:11px;">(avto)</span>' : ''} ${deleteAttButton(r)}</td>
-      <td style="padding:8px 4px;border-bottom:1px solid var(--card-border);text-align:right;">${r.late_minutes > 0 ? `<span class="late-badge">${fmtDuration(r.late_minutes)}</span>` : (r.type === 'checkin' && r.no_shift ? `<span style="font-size:11px;color:var(--yellow);">Smena yo'q</span>` : '')}</td>
-      <td style="padding:8px 4px;border-bottom:1px solid var(--card-border);">${reasonCell}</td>
+      <td class="name">${esc(r.staff_name || '-')}</td>
+      <td class="nowrap muted">${dateStr}</td>
+      <td class="nowrap strong">${timeStr}</td>
+      <td class="nowrap">${action}${r.auto_closed ? ' <span class="muted-warn">(avto)</span>' : ''}</td>
+      <td class="num">${late}</td>
+      <td class="reason">${reasonCell}</td>
+      ${canDel ? `<td class="act">${deleteAttButton(r)}</td>` : ''}
     </tr>`;
   }).join('')}</tbody>
 </table>
@@ -2385,6 +2398,7 @@ function switchAdminTab(tab) {
     document.getElementById('adm-' + t).classList.toggle('hidden', t !== tab);
     document.getElementById('adm-tab-' + t).classList.toggle('active', t === tab);
   });
+  scrollTabIntoView('adm-tab-' + tab);
   if (tab === 'staff') renderStaff();
   if (tab === 'branches') renderBranches();
   if (tab === 'penalty') renderPenaltySettings();
